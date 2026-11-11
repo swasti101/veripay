@@ -55,6 +55,20 @@
   }
   /* Money and counts must align down a column. */
   .tnum, table td, table th { font-variant-numeric: tabular-nums; }
+
+  /* Default spacing for hand-built tables. Without it adjacent cells collide
+     ("AMOUNTCOMMITTED?FUNDED…"). Lives in the base layer, so any padding utility
+     on a specific cell still wins. */
+  table { border-collapse: collapse; }
+  table th {
+    padding: 8px 14px 8px 0;
+    font-size: 12px; font-weight: 500; color: var(--color-ink-3);
+    text-align: left; text-transform: none; letter-spacing: 0;
+    white-space: nowrap; vertical-align: bottom;
+  }
+  table td { padding: 10px 14px 10px 0; vertical-align: middle; }
+  table th:last-child, table td:last-child { padding-right: 0; }
+  table thead tr { border-bottom: 1px solid var(--color-rule); }
   h1, h2, h3 { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.01em; }
   :focus-visible { outline: 2px solid var(--color-seal); outline-offset: 2px; }
   ::selection { background: var(--color-seal-wash); }
@@ -80,7 +94,7 @@
 
 /* ── Controls ─────────────────────────────────────────────────── */
 @utility btn {
-  @apply inline-flex items-center justify-center gap-1.5 rounded-[3px] px-3 py-[7px]
+  @apply inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-[3px] px-3 py-[7px]
          text-[13px] font-medium transition-colors cursor-pointer
          disabled:opacity-45 disabled:cursor-not-allowed;
 }

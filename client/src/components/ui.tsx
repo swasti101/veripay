@@ -47,7 +47,7 @@ export function Badge({ children, tone }: { children: ReactNode; tone?: string }
   const key = typeof children === 'string' ? children.replace(/^PENDING.*/, 'FUNDING_PENDING') : '';
   const t = tone || STATUS_TONE[key] || 'quiet';
   const text = typeof children === 'string'
-    ? children.replace(/_/g, ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase())
+    ? children.replace(/_/g, ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase()).replace(/\bqa\b/gi, 'QA')
     : children;
   return (
     <span className={`inline-flex items-center whitespace-nowrap rounded-[2px] border px-1.5 py-px text-[11px] font-medium ${TONES[t] || TONES.quiet}`}>

@@ -70,10 +70,10 @@ export default function Funding({ v, reload }: WsProps) {
         {!active ? <p className="muted">Funding opens after both parties approve the agreement (scope, milestones and payment terms).</p> : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase text-ink-3"><tr><th className="py-1">Item</th><th>Amount</th><th>Committed?</th><th>Funded</th><th>Status</th><th>Authorization</th><th>Released / paid</th><th /></tr></thead>
+              <thead className="text-ink-3"><tr><th className="min-w-[170px]">Item</th><th>Amount</th><th>Funded</th><th>Status</th><th>Authorization</th><th>Released / paid</th><th /></tr></thead>
               <tbody className="divide-y divide-rule">
                 {active.advanceAmount > 0 && (
-                  <tr><td className="py-2 font-medium">Advance (paid to freelancer on funding)</td><td>{money(active.advanceAmount)}</td><td>yes</td><td>{['FUNDING_REQUIRED', 'FUNDING_PENDING', 'PAYMENT_FAILED'].includes(p.advance.status) ? money(0) : money(active.advanceAmount)}</td><td><Badge>{p.advance.status}</Badge></td><td>capture</td><td>{money(p.advance.paid)}</td>
+                  <tr><td className="py-2 font-medium">Advance<div className="text-xs font-normal text-ink-3">Committed at signing · paid to the freelancer on funding</div></td><td className="whitespace-nowrap">{money(active.advanceAmount)}</td><td>{['FUNDING_REQUIRED', 'FUNDING_PENDING', 'PAYMENT_FAILED'].includes(p.advance.status) ? money(0) : money(active.advanceAmount)}</td><td><Badge>{p.advance.status}</Badge></td><td className="text-xs">Captured at once</td><td className="whitespace-nowrap">{money(p.advance.paid)}</td>
                     <td className="text-right">{party === 'client' && ['FUNDING_REQUIRED', 'FUNDING_PENDING', 'PAYMENT_FAILED'].includes(p.advance.status) && <PayPalCheckout projectId={p.id} target="ADVANCE" amount={active.advanceAmount} intent="CAPTURE" label="Pay advance" onDone={reload} />}</td></tr>
                 )}
                 {active.milestones.map((x: any) => {
@@ -82,10 +82,10 @@ export default function Funding({ v, reload }: WsProps) {
                   const need = x.amount - funded(x.id);
                   return (
                     <tr key={x.id}>
-                      <td className="py-2 font-medium">{x.id} {x.title}<div className="text-xs text-ink-3">due {d(x.dueDate)}</div></td>
-                      <td>{money(x.amount)}</td><td>{committed ? 'yes (up front)' : 'when due'}</td><td>{money(funded(x.id))}</td><td><Badge>{s?.fundingStatus}</Badge></td>
-                      <td className="text-xs">{s?.authorizationExpires ? <>expires {d(s.authorizationExpires)}<br />honor period to {d(s.honorPeriodEnds)}</> : '—'}</td>
-                      <td>{money(s?.captured || 0)} / {money(s?.paid || 0)}</td>
+                      <td className="py-2 font-medium">{x.id} {x.title}<div className="text-xs font-normal text-ink-3">Due {d(x.dueDate)} · {committed ? 'committed up front' : 'funded when due'}</div></td>
+                      <td className="whitespace-nowrap">{money(x.amount)}</td><td className="whitespace-nowrap">{money(funded(x.id))}</td><td><Badge>{s?.fundingStatus}</Badge></td>
+                      <td className="text-xs">{s?.authorizationExpires ? <>Expires {d(s.authorizationExpires)}<br />Honor period to {d(s.honorPeriodEnds)}</> : '—'}</td>
+                      <td className="whitespace-nowrap">{money(s?.captured || 0)} / {money(s?.paid || 0)}</td>
                       <td className="text-right">{party === 'client' && need > 0 && s?.workStatus !== 'ACCEPTED' && <PayPalCheckout projectId={p.id} target={x.id} amount={need} intent="AUTHORIZE" label={`Fund ${money(need)}`} onDone={reload} disabled={active.advanceAmount > 0 && ['FUNDING_REQUIRED', 'FUNDING_PENDING', 'PAYMENT_FAILED'].includes(p.advance.status)} />}</td>
                     </tr>
                   );

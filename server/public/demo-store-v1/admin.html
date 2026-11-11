@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="style.css"><script src="store.js"></script><title>Northwind — Admin dashboard</title></head>
+<body>
+<div class="demo">DEMO DELIVERABLE — revision 1 of the sample storefront. No real orders or payments.</div>
+<header><strong>Northwind Outfitters</strong><nav><a href="index.html">Home</a><a href="products.html">Shop products</a><a href="cart.html">Cart (<span id="cart-count">0</span>)</a><a href="admin.html">Admin dashboard</a></nav></header>
+<main>
+  <h1>Admin dashboard</h1>
+  <p>Sign in to manage products and orders.</p>
+  <form id="login"><p><input placeholder="Admin email" required></p><p><input type="password" placeholder="Password" required></p><button>Sign in</button></form>
+  <p id="m"></p>
+</main>
+<script>
+  document.getElementById('login').onsubmit = (e) => { e.preventDefault(); document.getElementById('m').textContent = 'Demo: the admin area is delivered in Milestone 3.'; };
+</script>
+</body>
+</html>

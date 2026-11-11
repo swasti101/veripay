@@ -146,6 +146,33 @@ if (filterPage) {
       filterProbe = { option: pick.t, before, after };
       await step('select', 'Chose "' + pick.t + '" in a filter', before + ' products became ' + after, after !== before, true);
       await sel.selectOption(opts[0].v);
+      await page.waitForTimeout(300);
+    }
+  }
+  // Do two filters combine? Apply each alone, then both. Combined results can never be more
+  // than either filter alone — if they are, the second filter is being ignored.
+  const sels = await page.$$('select');
+  if (sels.length >= 2) {
+    const firstOpt = async (s) => (await s.$$eval('option', (os) => os.map((o) => ({ v: o.value, t: o.textContent.trim() })))).filter((o) => o.v);
+    const [o1, o2] = [(await firstOpt(sels[0]))[0], (await firstOpt(sels[1]))[0]];
+    const reset0 = async () => { await sels[0].selectOption(''); await sels[1].selectOption(''); await page.waitForTimeout(300); };
+    if (o1 && o2) {
+      await reset0();
+      await sels[0].selectOption(o1.v); await page.waitForTimeout(400);
+      const onlyA = await visibleProducts();
+      await reset0();
+      await sels[1].selectOption(o2.v); await page.waitForTimeout(400);
+      const onlyB = await visibleProducts();
+      await sels[0].selectOption(o1.v); await page.waitForTimeout(400);   // both now set
+      const both = await visibleProducts();
+      const combines = both <= Math.min(onlyA, onlyB);
+      filterProbe = { ...(filterProbe || {}), combine: { a: o1.t, b: o2.t, onlyA, onlyB, both, combines } };
+      await step('select', 'Combined two filters: "' + o1.t + '" and "' + o2.t + '"',
+        combines
+          ? 'Alone they show ' + onlyA + ' and ' + onlyB + '; together ' + both + ' — the filters narrow each other'
+          : 'Alone they show ' + onlyA + ' and ' + onlyB + ', but together ' + both + ' — more than either alone, so one filter is being ignored',
+        combines, true);
+      await reset0();
     }
   }
 }
@@ -178,17 +205,68 @@ if (productLink) {
   } catch (e) { await step('click', 'Tried to open a product', 'Failed: ' + String(e).slice(0, 120), false, false); }
 }
 
+// 6b. Does the order total follow the quantity? Change it in the cart and re-read the total.
+// This only edits the visitor's own cart; nothing is ordered or paid.
+let totalProbe = null;
+if (cartProbe && cartProbe.changed) {
+  const cartLink = await page.$('a[href*="cart"]');
+  if (cartLink) {
+    try {
+      const from = page.url();
+      await Promise.all([page.waitForURL((u) => u.toString() !== from, { timeout: 10000 }).catch(() => {}), cartLink.click()]);
+      await page.waitForLoadState('networkidle');
+      const readTotal = () => page.$eval('body', (b) => {
+        const m = b.innerText.match(/total[^$\\n]*\\$\\s*([\\d,.]+)/i);
+        return m ? Number(m[1].replace(/,/g, '')) : null;
+      });
+      const qty = await page.$('input[type=number]');
+      const before = await readTotal();
+      if (qty && before !== null) {
+        const q0 = Number(await qty.inputValue()) || 1;
+        // Type and Tab away, as a person would: the browser fires one native change event.
+        // (A synthetic change on top of it re-renders the cart twice and logs a bogus error.)
+        await qty.fill(String(q0 + 1));
+        await qty.press('Tab');
+        await page.waitForTimeout(500);
+        const after = await readTotal();
+        // More items must cost more. (Exact arithmetic would assume a one-line cart.)
+        const follows = after !== null && after > before;
+        totalProbe = { qtyFrom: q0, qtyTo: q0 + 1, before, after, follows };
+        await step('type', 'Changed the quantity in the cart from ' + q0 + ' to ' + (q0 + 1),
+          follows ? 'Order total went from $' + before + ' to $' + after + ' — it follows the quantity'
+            : 'Order total stayed at $' + after + ' after adding another item — the total ignores the quantity',
+          follows, true);
+        // The cart re-renders on change, so the old handle is stale; find the field again.
+        const qtyAgain = await page.$('input[type=number]');
+        if (qtyAgain) { await qtyAgain.fill(String(q0)); await qtyAgain.press('Tab'); await page.waitForTimeout(300); }
+        // Remove the item again: the line should disappear. Still only the visitor's own cart.
+        const lines = async () => (await page.$$('input[type=number]')).length;
+        const rm = await page.$('button:has-text("Remove"), a:has-text("Remove")');
+        if (rm) {
+          const n0 = await lines();
+          await rm.click(); await page.waitForTimeout(400);
+          const n1 = await lines();
+          totalProbe.removed = n1 < n0;
+          await step('click', 'Clicked "Remove" on the cart line', n1 < n0 ? 'The line left the cart (' + n0 + ' → ' + n1 + ')' : 'The line is still in the cart', n1 < n0, true);
+        }
+      } else {
+        await step('inspect', 'Looked for a quantity field and an order total in the cart', 'Could not find both on the cart page', false, true);
+      }
+    } catch (e) { await step('type', 'Tried to change the cart quantity', 'Failed: ' + String(e).slice(0, 120), false, false); }
+  }
+}
+
 // 7. Accessibility spot check on the last page
 const last = await facts();
 await step('inspect', 'Checked images for alternative text', last.imagesMissingAlt ? last.imagesMissingAlt + ' image(s) have no alt text' : 'Every image has alt text', last.imagesMissingAlt === 0, false);
 
-return { pages, steps, errors, searchProbe, filterProbe, cartProbe };
+return { pages, steps, errors, searchProbe, filterProbe, cartProbe, totalProbe };
 `;
 }
 
 interface JourneyResult {
   pages: KernelRun['pages']; steps: NonNullable<KernelRun['steps']>; errors: string[];
-  searchProbe: any; filterProbe: any; cartProbe: any;
+  searchProbe: any; filterProbe: any; cartProbe: any; totalProbe?: any;
 }
 
 /** Persist step screenshots as evidence and fold probe results into page signals for QA. */
@@ -204,8 +282,13 @@ function toRun(mode: KernelRun['mode'], note: string, r: JourneyResult, actions:
   const first = r.pages[0];
   if (first) {
     if (r.searchProbe) first.signals.searchProbe = `typed "${r.searchProbe.term}": ${r.searchProbe.before} → ${r.searchProbe.after} products in ${r.searchProbe.ms} ms`;
-    if (r.filterProbe) first.signals.filterProbe = `"${r.filterProbe.option}": ${r.filterProbe.before} → ${r.filterProbe.after}`;
+    if (r.filterProbe?.option) first.signals.filterProbe = `"${r.filterProbe.option}": ${r.filterProbe.before} → ${r.filterProbe.after}`;
+    const c = r.filterProbe?.combine;
+    if (c) first.signals.filterCombine = `${c.combines ? 'combine' : 'do not combine'}: "${c.a}" alone ${c.onlyA}, "${c.b}" alone ${c.onlyB}, both ${c.both}`;
     if (r.cartProbe) first.signals.addToCart = r.cartProbe.changed ? `cart changed "${r.cartProbe.before}" → "${r.cartProbe.after}"` : 'no visible change';
+    const t = r.totalProbe;
+    if (t) first.signals.cartTotal = `${t.follows ? 'follows quantity' : 'ignores quantity'}: qty ${t.qtyFrom} → ${t.qtyTo}, total $${t.before} → $${t.after}`;
+    if (t && t.removed !== undefined) first.signals.cartRemove = t.removed ? 'removing a line works' : 'removing a line did nothing';
   }
   return { mode, note, actions, pages: r.pages, steps, consoleErrors: r.errors, screenshots, ...extra };
 }

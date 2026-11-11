@@ -35,6 +35,9 @@ function kernelSignalsFor(req: Requirement, k: KernelRun) {
   const t = (req.title + ' ' + req.description).toLowerCase();
   const pos: string[] = [];
   const neg: string[] = [];
+  // Behaviour the browser reproduced that contradicts a measurable acceptance criterion.
+  // These are decisive: no amount of other good evidence turns them into a pass.
+  const defects: string[] = [];
   const pagesMatching = (re: RegExp) => k.pages.filter((p) => re.test(p.url) || p.headings.some((h) => re.test(h)) || re.test(p.title));
   const any = (key: string) => k.pages.some((p) => !!p.signals[key] && p.signals[key] !== 0);
   const live = k.mode === 'KERNEL_LIVE' || k.mode === 'LOCAL_BROWSER';
@@ -67,11 +70,24 @@ function kernelSignalsFor(req: Requirement, k: KernelRun) {
       const m = f.match(/(\d+) → (\d+)/);
       (m && m[1] !== m[2] ? pos : neg).push(`${src}: changing a filter ${m && m[1] !== m[2] ? 'changed' : 'did not change'} the results (${f})`);
     }
+    if (first.filterCombine) {
+      const f = String(first.filterCombine);
+      const line = `${src}: two filters together ${/^combine/.test(f) ? 'narrowed each other' : 'showed more products than either alone — one filter is ignored'} (${f.replace(/^[^:]+: /, '')})`;
+      (/^combine/.test(f) ? pos : neg).push(line);
+      if (!/^combine/.test(f) && /combin/i.test(req.acceptanceCriteria.join(' ') + ' ' + req.description)) defects.push(line);
+    }
   }
   if (/cart|checkout/.test(t)) {
     const c = pagesMatching(/cart|checkout/i);
     (c.length || any('cartLink') ? pos : neg).push(`${src}: ${c.length ? 'cart/checkout page reached' : any('cartLink') ? 'cart control present' : 'no cart or checkout found'}`);
     if (first.addToCart) (/changed/.test(String(first.addToCart)) ? pos : neg).push(`${src}: clicking "Add to cart" — ${first.addToCart}`);
+    if (first.cartTotal) {
+      const f = String(first.cartTotal);
+      const line = `${src}: order total ${/^follows/.test(f) ? 'updated when the quantity changed' : 'did not change when the quantity changed'} (${f.replace(/^[^:]+: /, '')})`;
+      (/^follows/.test(f) ? pos : neg).push(line);
+      if (!/^follows/.test(f) && /total|quantit/i.test(req.acceptanceCriteria.join(' ') + ' ' + req.description)) defects.push(line);
+    }
+    if (first.cartRemove) (/works/.test(String(first.cartRemove)) ? pos : neg).push(`${src}: ${first.cartRemove}`);
     const form = k.pages.find((p) => Number(p.signals.requiredFields) > 0);
     if (form) pos.push(`${src}: checkout form found with ${form.signals.requiredFields} required fields (not submitted — no order is ever placed)`);
   }
@@ -81,22 +97,25 @@ function kernelSignalsFor(req: Requirement, k: KernelRun) {
   }
   const broken = k.pages.filter((p) => Number(p.signals.httpStatus) >= 400).map((b) => `${src}: ${b.url} returned HTTP ${b.signals.httpStatus}`);
   // Static HTML cannot see client-rendered content, so an absent element is NOT evidence of non-compliance.
-  if (!live) return { pos, neg: broken, notes: neg.map((n) => `${n} (not conclusive — static inspection)`) };
-  return { pos, neg: [...neg, ...broken], notes: [] as string[] };
+  if (!live) return { pos, neg: broken, notes: neg.map((n) => `${n} (not conclusive — static inspection)`), defects: [] as string[] };
+  return { pos, neg: [...neg, ...broken], notes: [] as string[], defects };
 }
 
 function heuristicQA(ctx: Ctx): { results: QAResult[]; domainAgents: QARun['domainAgents']; vision: QARun['vision']; text: QARun['text'] } {
   const tests = testReportLines(ctx.docTexts);
   const shots = ctx.submission.evidence.filter((e) => e.kind === 'screenshot').length + ctx.kernel.screenshots.length;
   const results: QAResult[] = ctx.requirements.map((r) => {
-    const { pos, neg, notes } = kernelSignalsFor(r, ctx.kernel);
+    const { pos, neg, notes, defects } = kernelSignalsFor(r, ctx.kernel);
     const t = tests.filter((x) => x.reqId === r.id);
     const claim = ctx.submission.claims.find((c) => c.requirementId === r.id);
     const evidence = [...pos, ...neg, ...notes, ...t.map((x) => `${x.source}: ${x.reqId} ${x.status} — ${x.text}`), ...(claim ? [`Freelancer claim: ${claim.note}`] : [])];
     let status: VerificationStatus = 'UNVERIFIED';
     let explanation = '';
     let confidence: QAResult['confidence'] = 'LOW';
-    if (r.ambiguity && !r.clarification) {
+    if (defects.length) {
+      status = 'FAIL'; confidence = 'HIGH';
+      explanation = `The browser run reproduced a defect: ${defects[0].replace(/^[^:]+: /, '')}.`;
+    } else if (r.ambiguity && !r.clarification) {
       status = 'NEEDS_CLARIFICATION';
       explanation = `Acceptance cannot be measured: ${r.ambiguity}`;
     } else if (t.some((x) => x.status === 'FAIL') || (neg.length && !pos.length)) {
@@ -137,6 +156,17 @@ function applyGuardrails(results: QAResult[], ctx: Ctx) {
   for (const res of results) {
     const r = ctx.requirements.find((x) => x.id === res.requirementId);
     if (!r) continue;
+    // A defect reproduced in a real browser outranks everything else, including an AI verdict
+    // and an unclarified wording elsewhere in the requirement.
+    const { defects } = kernelSignalsFor(r, ctx.kernel);
+    if (defects.length && res.status !== 'FAIL') {
+      res.guardrail = `A real browser reproduced a defect against a measurable acceptance criterion, so this cannot be ${res.status}.`;
+      res.status = 'FAIL';
+      res.confidence = 'HIGH';
+      res.explanation = `The browser run reproduced a defect: ${defects[0].replace(/^[^:]+: /, '')}.`;
+      for (const d of defects) if (!res.evidence.includes(d)) res.evidence.unshift(d);
+      res.nextAction = '';
+    }
     if (r.ambiguity && !r.clarification && res.status === 'PASS') {
       res.status = 'NEEDS_CLARIFICATION';
       res.guardrail = 'Requirement wording is flagged as unmeasurable and has no approved clarification — cannot be PASS.';

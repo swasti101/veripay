@@ -71,7 +71,7 @@ export default function Overview({ v, reload }: WsProps) {
           {!ag ? <p className="muted">Upload a SOW to extract milestones.</p> : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="text-left text-xs uppercase text-ink-3"><tr><th className="py-1">Milestone</th><th>Due</th><th>Amount</th><th>Funding</th><th>Work</th><th className="text-right">Paid</th></tr></thead>
+                <thead className="text-ink-3"><tr><th>Milestone</th><th>Due</th><th>Amount</th><th>Funding</th><th>Work</th><th className="text-right">Paid</th></tr></thead>
                 <tbody className="divide-y divide-rule">
                   {ag.advanceAmount > 0 && <tr><td className="py-2 font-medium">Advance</td><td>on signing</td><td>{money(ag.advanceAmount)}</td><td><Badge>{p.advance.status}</Badge></td><td>—</td><td className="text-right">{money(p.advance.paid)}</td></tr>}
                   {ag.milestones.map((m: any) => {

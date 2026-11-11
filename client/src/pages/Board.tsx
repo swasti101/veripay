@@ -98,7 +98,7 @@ export default function Board() {
       <Section title="Funding tranches vs. phases">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase text-ink-3"><tr><th className="py-1">Project</th><th>Milestone</th><th>Due</th><th>Tranche</th><th>Funded</th><th>Work</th><th>Blocking?</th></tr></thead>
+            <thead className="text-ink-3"><tr><th>Project</th><th>Milestone</th><th>Due</th><th>Tranche</th><th>Funded</th><th>Work</th><th>Blocking?</th></tr></thead>
             <tbody className="divide-y divide-rule">
               {b.projects.flatMap((p: any) => p.milestones.map((m: any) => (
                 <tr key={p.id + m.id} className={m.blockedByFunding ? 'bg-refuse-wash' : undefined}>

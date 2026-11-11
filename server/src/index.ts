@@ -67,6 +67,9 @@ app.get('/evidence/:name', evidenceHandler);
 app.get('/openapi.yaml', (_req, res) => res.type('text/yaml').sendFile(path.join(ROOT, 'apimatic', 'src', 'spec', 'openapi.yaml')));
 // Public demo deliverable (the "freelancer's website" that Kernel inspects). Anonymous by design.
 app.use('/demo-store', express.static(path.join(ROOT, 'server', 'public', 'demo-store'), { extensions: ['html'] }));
+// Revision 1 of the same storefront, with two planted defects (filters do not combine; the
+// cart total ignores quantity) so the walkthrough can show the agent catching real bugs.
+app.use('/demo-store-v1', express.static(path.join(ROOT, 'server', 'public', 'demo-store-v1'), { extensions: ['html'] }));
 
 const dist = path.join(ROOT, 'client', 'dist');
 if (fs.existsSync(dist)) {

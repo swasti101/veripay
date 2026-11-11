@@ -204,7 +204,7 @@ export default function Agreement({ v, reload }: WsProps) {
       <Section title="Milestones" actions={edit && <button className="btn-secondary" onClick={() => upd((x) => x.milestones.push({ id: `M${x.milestones.length + 1}`, title: 'New milestone', description: '', startDate: '', dueDate: '', amount: 0, dependsOn: [] }))}>+ Milestone</button>}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase text-ink-3"><tr><th>ID</th><th>Title</th><th>Start</th><th>Due</th><th>Amount</th><th>Requirements</th>{edit && <th />}</tr></thead>
+            <thead className="text-ink-3"><tr><th>ID</th><th>Title</th><th>Start</th><th>Due</th><th>Amount</th><th>Requirements</th>{edit && <th />}</tr></thead>
             <tbody className="divide-y divide-rule">
               {shown.milestones.map((m: any, i: number) => (
                 <tr key={i}>

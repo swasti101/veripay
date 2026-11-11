@@ -93,8 +93,14 @@ export default function Delivery({ v, reload, mid }: WsProps) {
   const qas = v.qaRuns.filter((q: any) => q.milestoneId === mid);
   const [qaId, setQaId] = useState<string | null>(null);
   const qa = qas.find((q: any) => q.id === qaId) || qas.at(-1);
-  const defaultUrl = `${config?.publicBaseUrl || location.origin}/demo-store/index.html`;
-  const [f, setF] = useState({ url: '', notes: '', authorize: true, demo: false });
+  // Demo storyline: the first submission is revision 1 of the storefront (two planted bugs the
+  // computer agent catches), and every later submission is the fixed storefront.
+  const base = config?.publicBaseUrl || location.origin;
+  const brokenUrl = `${base}/demo-store-v1/index.html`, fixedUrl = `${base}/demo-store/index.html`;
+  const defaultUrl = subs.length ? fixedUrl : brokenUrl;
+  // The sample report claims everything passes — useful in the demo because the browser run
+  // then contradicts it on revision 1, and covers the sandbox confirmation the agent never clicks.
+  const [f, setF] = useState({ url: '', notes: '', authorize: true, demo: !!p.isDemo });
   const [claims, setClaims] = useState<Record<string, string>>({});
   const [files, setFiles] = useState<FileList | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -114,7 +120,7 @@ export default function Delivery({ v, reload, mid }: WsProps) {
     fd.append('claims', JSON.stringify(Object.entries(claims).filter(([, n]) => n.trim()).map(([requirementId, note]) => ({ requirementId, note }))));
     if (files) for (const file of Array.from(files)) fd.append('files', file);
     await api.post(`/projects/${p.id}/milestones/${mid}/submissions`, fd);
-    setQaId(null); setClaims({}); setFiles(null); setShowForm(false);
+    setQaId(null); setClaims({}); setFiles(null); setShowForm(false); setF((x) => ({ ...x, url: '' }));
     await reload();
   });
 
@@ -151,7 +157,12 @@ export default function Delivery({ v, reload, mid }: WsProps) {
             <div>
               <label className="field-label" htmlFor="sub-url">Where can it be seen?</label>
               <input id="sub-url" className="input" value={f.url} onChange={(e) => setF({ ...f, url: e.target.value })} placeholder="https://staging.yoursite.com" />
-              {p.isDemo && <p className="mt-1.5 text-[12px] text-ink-3">The demo storefront is pre-filled: <span className="mono">{defaultUrl}</span></p>}
+              {p.isDemo && (
+                <p className="mt-1.5 text-[12px] text-ink-3">
+                  Demo storefront: <button type="button" className="underline decoration-rule-strong underline-offset-2 hover:text-ink" onClick={() => setF({ ...f, url: brokenUrl })}>revision 1</button> has two planted bugs (filters don't combine; the cart total ignores quantity),{' '}
+                  <button type="button" className="underline decoration-rule-strong underline-offset-2 hover:text-ink" onClick={() => setF({ ...f, url: fixedUrl })}>revision 2</button> is the fixed version. {subs.length ? 'Revision 2' : 'Revision 1'} is pre-filled.
+                </p>
+              )}
               {config?.kernel.configured && /127\.0\.0\.1|localhost/.test(f.url) && (
                 <p className="mt-1.5 text-[12px] text-hold">Kernel runs in the cloud and cannot reach localhost. Deploy first, or set PUBLIC_BASE_URL.</p>
               )}

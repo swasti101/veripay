@@ -60,7 +60,7 @@ export default function Payments({ v, reload, mid }: WsProps) {
               </div>
             </div>
             <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase text-ink-3"><tr><th className="py-1">Requirement</th><th>Effective status</th><th>Basis</th><th>Agreed amount</th><th>Treatment</th></tr></thead>
+              <thead className="text-ink-3"><tr><th>Requirement</th><th>Effective status</th><th>Basis</th><th>Agreed amount</th><th>Treatment</th></tr></thead>
               <tbody className="divide-y divide-rule">{cur.lines.map((l: any) => (
                 <tr key={l.requirementId}><td className="py-1.5"><b>{l.requirementId}</b> {l.title}</td><td><Badge>{l.status}</Badge></td><td className="text-xs text-ink-2">{l.basis}</td><td>{money(l.amount)}</td><td><Badge tone={l.treatment === 'RELEASE' ? 'green' : 'violet'}>{l.treatment}</Badge></td></tr>
               ))}</tbody>

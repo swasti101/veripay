@@ -19,7 +19,7 @@ export default function Integrations() {
     <main className="mx-auto max-w-5xl space-y-4 px-4 py-6">
       <Section title="Integration status">
         <table className="w-full text-sm">
-          <thead className="text-left text-xs uppercase text-ink-3"><tr><th className="py-1">Integration</th><th>Status</th><th>What it does</th><th>Configuration</th></tr></thead>
+          <thead className="text-ink-3"><tr><th>Integration</th><th>Status</th><th>What it does</th><th>Configuration</th></tr></thead>
           <tbody className="divide-y divide-rule align-top">{rows.map(([n, s, w, c]) => (
             <tr key={n}><td className="py-2 font-semibold">{n}</td><td>{/SIMULATED|DEMO|HEURISTIC/.test(s) ? <SimTag label={s} /> : <Badge tone="green">{s}</Badge>}</td><td className="pr-3 text-ink-2">{w}</td><td className="text-xs text-ink-3">{c}</td></tr>
           ))}</tbody>

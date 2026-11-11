@@ -15,26 +15,43 @@ Open `http://127.0.0.1:4000/`. Point at the hero specimen: one real payment deci
 the three analysers and the domain tiles: each domain names which analysers check that kind of work.
 Click **Open the demo** → **Demo** tab → **Sam Okafor** (freelancer).
 
-### 1 · The freelancer submits (~1 min)
-Projects → Northwind → **Submit & verify** in the rail. The URL of the demo storefront is pre-filled.
-Leave *Let the computer agent use this site* ticked and press **Submit for verification**.
-The stage track at the top moves Funded → Submitted.
+### 1 · Revision 1 — the agent catches two real bugs (~2 min)
+Projects → Northwind → **Submit & verify** → milestone **M2 Search & Checkout**. The first submission is
+pre-filled with **revision 1** of the storefront (`/demo-store-v1/`), which has two planted bugs: the category
+and price filters do not combine, and the cart total ignores the quantity. The sample test report is ticked
+too — it claims everything passes. Press **Submit for verification**.
 
-### 2 · Three analysers at work (~3 min — the core of the demo)
-The report opens in three layers:
+When the run finishes:
+- An amber banner reads **Not sent to the client yet — 2 of 2 requirements you can act on still need work**.
+  More than 50% unfinished (`PRECHECK_MAX_UNFINISHED`, default 0.5), so the revision goes back to the
+  freelancer and the client never sees it.
+- **REQ-04 Fail** and **REQ-05 Fail**, each with *Fairness rule applied*: a defect reproduced in a real browser
+  outranks the AI's verdict, the sample report's "PASS" claim and REQ-04's ambiguous wording.
+- **Computer agent** tab, two red steps, each with a screenshot:
+  *Combined two filters: "tops" and "Under $50" — alone they show 3 and 2, but together 3* and
+  *Changed the quantity in the cart from 1 to 2 — order total stayed at $68*.
+- **View as · Client**: the submission says *Revision 1 went back to the freelancer*; the report is hidden.
+
+### 2 · Revision 2 — the fix passes (~2 min)
+As Sam: **Submit a revision**. The URL is now pre-filled with **revision 2** (`/demo-store/`, the fixed store;
+both links sit under the URL field). Submit. This time the agent shows
+*together 0 — the filters narrow each other* and *Order total went from $68 to $136*, then removes the item.
+REQ-05 **Pass**; REQ-04 **Needs clarification** (the SOW still says "fast" with no threshold — that is the
+client's to settle, so it does not hold the revision back). Pre-check passes and the report goes to the client.
+
+Walk the report in three layers:
 - **Verdict** — one line, with counts per status and which engine produced each part.
-- **Requirement by requirement** — open REQ-04 and REQ-05. Each shows what the agreement asks for, then
-  what the computer agent, vision analyser and text analyser each found. REQ-04 carries a purple
-  *Fairness rule applied* note: the SOW says "fast" and "relevant" with no threshold, so it cannot be passed.
-- **Computer agent** tab — the journey replay. Read it out: it opened the site, resized to a phone,
-  followed the catalogue link, **typed "linen" and 12 products became 2**, typed a nonsense term and
-  checked the empty state, **chose a filter and 12 became 3**, opened a product and **clicked "Add to cart" —
-  the cart went from (0) to (1)**. Click any thumbnail to enlarge the screenshot taken at that step.
-- **Vision analyser** tab — the captured screenshots. With an AI key it reads them against the criteria.
-- **Text analyser** tab — notes, documents and test reports read against the SOW.
+- **Requirement by requirement** — each row shows what the agreement asks for, then what the computer agent,
+  vision analyser and text analyser each found.
+- **Computer agent** tab — the 15-step journey replay: desktop, phone, catalogue, search "linen" (12 → 2),
+  empty state, one filter, two filters together, product → **Add to cart** (Cart (0) → (1)), quantity → total,
+  remove, alt text. Click a thumbnail to enlarge the screenshot taken at that step.
+- **Vision analyser** / **Text analyser** tabs — screenshots and documents read against the criteria.
 
 Say the honest bit out loud: the badge says *Local browser* — a real Chromium running the exact
-script Kernel would run. With `KERNEL_API_KEY` set it runs in Kernel's cloud browser instead.
+script Kernel would run. With `KERNEL_API_KEY` set it runs in Kernel's cloud browser instead (Kernel needs a
+public URL, so deploy first). The agent never submits checkout — the sandbox confirmation page is evidenced by
+the freelancer's report, and the report says so.
 
 ### 3 · The agent talks to the freelancer (~30 s)
 Rail → **Messages**. The **Freelancer Delivery Agent** has posted, privately to the freelancer, what each
@@ -74,7 +91,8 @@ Lumen Analytics (failed PDF export → $2,500 paid, $1,500 held), Harbor Dental 
 
 | What | How | Expected |
 |---|---|---|
-| Computer agent (no keys) | Submit the demo storefront URL as Sam | 12 steps, ~10 screenshots, "Cart (0) → Cart (1)", mode *Local browser* |
+| Computer agent (no keys) | Submit revision 1 (`/demo-store-v1/`) to M2 as Sam | 15 steps, two red: filters do not combine, total stays $68. Pre-check returns it; client sees nothing |
+| Fixed revision | Submit revision 2 (`/demo-store/`) | Filters together 0, total $68 → $136. REQ-05 Pass, pre-check passes, client sees the report |
 | Computer agent (Kernel) | Add `KERNEL_API_KEY`, deploy, submit the **public** URL | Same journey, mode *Kernel cloud browser*, a session id |
 | Vision + text with a model | Add `GROQ_API_KEY` (or Anthropic/Gemini), restart, resubmit | Vision tab shows per-requirement observations; header names the model |
 | Out-of-scope detection | Ask the PM "Can you also add typo-tolerant search?" as client | Exclusion quoted, change request opened |

@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="style.css"><script src="store.js"></script><title>Northwind Outfitters — Home</title></head>
+<body>
+<div class="demo">DEMO DELIVERABLE — revision 1 of the sample storefront. No real orders or payments.</div>
+<header><strong>Northwind Outfitters</strong><nav><a href="index.html">Home</a><a href="products.html">Shop products</a><a href="cart.html">Cart (<span id="cart-count">0</span>)</a><a href="admin.html">Admin dashboard</a></nav></header>
+<main>
+  <section class="hero"><h1>Built for the trail, made to last</h1><p>Durable clothing for everyday adventures.</p><a href="products.html"><button>Shop the catalogue</button></a></section>
+  <h2>Featured products</h2>
+  <div class="grid" id="featured"></div>
+</main>
+<script>document.getElementById('featured').innerHTML = PRODUCTS.slice(0, 4).map(card).join('');</script>
+</body>
+</html>
