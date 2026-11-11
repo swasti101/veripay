@@ -39,6 +39,7 @@ export default function Dashboard() {
           <p className="muted">{isClient ? 'Projects you fund, approvals waiting on you, and where your money is.' : 'Projects you deliver, what is funded, and what you have earned.'}</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link to="/board" className="btn-secondary">Delivery board</Link>
           <Link to="/analytics" className="btn-secondary">Analytics</Link>
           <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (code.trim()) nav(`/join/${code.trim().toUpperCase()}`); }}>
             <input className="input w-40" placeholder="Invite code" value={code} onChange={(e) => setCode(e.target.value)} />

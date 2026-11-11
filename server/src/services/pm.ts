@@ -48,6 +48,15 @@ export function coordinate(project: Project) {
       once(project, `fund-${ms.id}`, { agent: AGENTS.coordinator, audience: 'client', kind: 'notice', text: `${ms.id} must be funded before the freelancer can start it.` });
     if (st.authorizationExpires && Date.parse(st.authorizationExpires) - nowMs < 5 * 864e5 && st.fundingStatus === 'AUTHORIZED')
       once(project, `authexp-${ms.id}-${st.authorizationExpires}`, { agent: AGENTS.coordinator, audience: 'client', kind: 'notice', text: `The PayPal authorization for ${ms.id} expires ${st.authorizationExpires.slice(0, 10)}. Authorizations cannot be held indefinitely; re-fund the milestone if assessment will take longer.` });
+    // A hold that lapses before the work is even due can never be captured — flag it early,
+    // while there is still time to re-fund rather than discovering it at release.
+    if (st.authorizationExpires && !isNaN(due) && Date.parse(st.authorizationExpires) < due && st.fundingStatus === 'AUTHORIZED')
+      once(project, `authbeforedue-${ms.id}-${st.authorizationExpires}`, { agent: AGENTS.coordinator, audience: 'all', kind: 'notice', text: `Schedule conflict on ${ms.id}: the PayPal authorization lapses ${st.authorizationExpires.slice(0, 10)} but the milestone is not due until ${ms.dueDate}. It cannot be captured after it lapses, so this milestone will need re-funding — or both parties can agree a new agreement version with an earlier due date. I cannot change the agreed dates myself.` });
+    // Funding is a predecessor of the work in this product, so an unfunded milestone with a
+    // near due date is a schedule problem, not just a payment one.
+    const gap = ms.amount - st.authorized - st.captured;
+    if (gap > 0 && st.workStatus === 'NOT_STARTED' && !isNaN(due) && due - nowMs < 7 * 864e5)
+      once(project, `blocked-${ms.id}-${ms.dueDate}`, { agent: AGENTS.coordinator, audience: 'all', kind: 'notice', text: `${ms.id} is due ${ms.dueDate} but ${gap} of its ${ms.amount} is still unfunded, so the freelancer cannot start it. Funding it now protects the date; otherwise the date needs to move, which requires a new agreement version both parties approve.` });
     const qa = d.qaRuns.filter((q) => q.projectId === project.id && q.milestoneId === ms.id && q.status === 'COMPLETE').at(-1);
     if (!qa) continue;
     const unverified = qa.results.filter((r) => r.status === 'UNVERIFIED');

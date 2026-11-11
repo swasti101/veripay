@@ -138,6 +138,116 @@ api.get('/dashboard', h((req) => {
   return { projects, transactions: txs, milestones };
 }));
 
+// ───────────────────────── delivery board & review triage ─────────────────────────
+// Feeds the cross-project Gantt and the expert-review Scheduler. Read-only: this endpoint
+// never moves a date. The agreed baseline can only change through an approved agreement
+// version, so everything here is a flag or a proposal, never an applied reschedule.
+api.get('/board', h((req) => {
+  const u = U(req);
+  const d = db();
+  const mine = d.projects.filter((p) => partyOf(p, u));
+  const nowMs = Date.now();
+  const DAY = 864e5;
+
+  const projects = mine.map((p) => {
+    const ag = activeAgreement(p) || draftAgreement(p);
+    if (!ag) return null;
+    const party = partyOf(p, u)!;
+    const counterpart = d.users.find((x) => x.id === (party === 'client' ? p.freelancerId : p.clientId))?.name || '(not joined)';
+
+    const milestones = ag.milestones.map((m, i) => {
+      const st = p.milestoneStates.find((s) => s.milestoneId === m.id);
+      const funded = (st?.authorized || 0) + (st?.captured || 0);
+      const fundingGap = Math.max(0, m.amount - funded);
+      // Our product rule: work cannot begin on an unfunded milestone. That makes funding a
+      // genuine predecessor of the work, not just a status column.
+      const blockedByFunding = fundingGap > 0 && st?.workStatus === 'NOT_STARTED';
+      const due = Date.parse(m.dueDate);
+      const start = Date.parse(m.startDate) || Date.parse(ag.milestones[i - 1]?.dueDate) || nowMs;
+      const overdue = !isNaN(due) && due < nowMs && !['ACCEPTED', 'CLOSED'].includes(st?.workStatus || '');
+      // A funding hold that lapses before the work is assessed cannot be captured.
+      const authExpiresBeforeDue = !!st?.authorizationExpires && !isNaN(due) && Date.parse(st.authorizationExpires) < due;
+      return {
+        id: m.id, title: m.title, amount: m.amount,
+        startDate: m.startDate || new Date(start).toISOString().slice(0, 10),
+        dueDate: m.dueDate || new Date(start + 7 * DAY).toISOString().slice(0, 10),
+        dependsOn: m.dependsOn || [],
+        workStatus: st?.workStatus || 'DRAFT', fundingStatus: st?.fundingStatus || 'DRAFT',
+        funded, fundingGap, blockedByFunding, overdue, authExpiresBeforeDue,
+        authorizationExpires: st?.authorizationExpires || null,
+        paid: st?.paid || 0, platformFee: st?.platformFee || 0, captured: st?.captured || 0,
+        daysToDue: isNaN(due) ? null : Math.round((due - nowMs) / DAY),
+      };
+    });
+
+    return {
+      id: p.id, title: p.title, status: p.status, party, counterpart, isDemo: p.isDemo,
+      advance: { ...p.advance, blocking: ag.advanceAmount > 0 && !['CAPTURED', 'PAID', 'PARTIALLY_PAID', 'AWAITING_DISBURSEMENT'].includes(p.advance.status) },
+      milestones,
+    };
+  }).filter(Boolean);
+
+  // ── Expert review triage: one row per reviewer, one block per assigned review.
+  const reviews = d.expertReviews.filter((r) => mine.some((p) => p.id === r.projectId));
+  const expertIds = [...new Set(reviews.flatMap((r) => r.assignments.map((a) => a.expertId)))];
+  const reviewers = expertIds.map((id) => {
+    const prof = d.experts.find((e) => e.userId === id);
+    return { id, name: d.users.find((x) => x.id === id)?.name || id, expertise: prof?.expertise || [], simulated: !!prof?.isSimulated, rating: prof?.rating ?? null };
+  });
+
+  const assignments = reviews.flatMap((r) => {
+    const p = mine.find((x) => x.id === r.projectId)!;
+    const alloc = d.allocations.filter((a) => a.projectId === r.projectId && a.milestoneId === r.milestoneId).at(-1);
+    const qa = d.qaRuns.filter((q) => q.projectId === r.projectId && q.milestoneId === r.milestoneId && q.status === 'COMPLETE').at(-1);
+    // Evidence readiness: a packet whose requirements are all UNVERIFIED gives reviewers nothing to judge.
+    const covered = r.requirementIds.filter((id) => {
+      const res = qa?.results.find((x) => x.requirementId === id);
+      return res && res.status !== 'UNVERIFIED' && res.evidence.length > 0;
+    }).length;
+    const voted = new Set(r.votes.map((v) => v.expertId)).size;
+    const open = r.status === 'VOTING' || r.status === 'AWAITING_FEE_ACK';
+    const closes = Date.parse(r.closesAt);
+    const hoursLeft = isNaN(closes) ? null : Math.round((closes - nowMs) / 36e5);
+    // The real failure mode: the window closes without enough votes, the panel is INCONCLUSIVE
+    // and the disputed amount stays frozen. Equivalent to "a deadline with no time allocated".
+    const quorumAtRisk = open && voted < r.quorum && hoursLeft !== null && hoursLeft < 24;
+    return r.assignments.map((a) => ({
+      reviewId: r.id, expertId: a.expertId, project: p.title, projectId: p.id, milestoneId: r.milestoneId,
+      requirementIds: r.requirementIds, status: r.status, assignmentStatus: a.status,
+      startDate: a.acceptedAt || r.createdAt, closesAt: r.closesAt, hoursLeft,
+      disputedAmount: alloc?.disputedAmount ?? 0, fee: r.fee,
+      evidenceReady: `${covered}/${r.requirementIds.length}`,
+      evidenceThin: covered < r.requirementIds.length,
+      votesIn: voted, quorum: r.quorum, quorumAtRisk,
+      // Accepted the assignment but never voted while the clock runs down.
+      stalled: open && a.status === 'ACCEPTED' && hoursLeft !== null && hoursLeft < 24,
+      unanswered: open && a.status === 'INVITED',
+    }));
+  });
+
+  // ── Payment-event flags the AI PM raises. Proposals only — nothing is auto-applied.
+  const flags: { severity: 'critical' | 'warning' | 'info'; projectId: string; project: string; milestoneId: string | null; text: string; tab: string }[] = [];
+  for (const p of projects as any[]) {
+    if (p.advance.blocking) flags.push({ severity: 'critical', projectId: p.id, project: p.title, milestoneId: null, text: `The agreed advance is ${p.advance.status.replace(/_/g, ' ').toLowerCase()}, so no milestone can start.`, tab: 'funding' });
+    for (const m of p.milestones) {
+      if (m.blockedByFunding) flags.push({ severity: m.daysToDue !== null && m.daysToDue < 7 ? 'critical' : 'warning', projectId: p.id, project: p.title, milestoneId: m.id, text: `${m.id} needs ${money0(m.fundingGap)} before work can begin${m.daysToDue !== null ? `, and is due in ${m.daysToDue} day(s)` : ''}.`, tab: 'funding' });
+      if (m.overdue) flags.push({ severity: 'warning', projectId: p.id, project: p.title, milestoneId: m.id, text: `${m.id} passed its due date while ${m.workStatus.replace(/_/g, ' ').toLowerCase()}.`, tab: 'delivery' });
+      if (m.authExpiresBeforeDue) flags.push({ severity: 'critical', projectId: p.id, project: p.title, milestoneId: m.id, text: `The PayPal authorization for ${m.id} lapses ${m.authorizationExpires?.slice(0, 10)}, before the ${m.dueDate} due date — it cannot be captured after that, so re-funding will be needed.`, tab: 'funding' });
+    }
+  }
+  for (const a of assignments) {
+    if (a.quorumAtRisk) flags.push({ severity: 'critical', projectId: a.projectId, project: a.project, milestoneId: a.milestoneId, text: `Expert review on ${a.milestoneId} closes in ${a.hoursLeft}h with ${a.votesIn}/${a.quorum} votes — short of quorum it is INCONCLUSIVE and ${money0(a.disputedAmount)} stays frozen.`, tab: 'experts' });
+    else if (a.evidenceThin && a.status === 'VOTING') flags.push({ severity: 'warning', projectId: a.projectId, project: a.project, milestoneId: a.milestoneId, text: `Reviewers on ${a.milestoneId} have evidence for only ${a.evidenceReady} requirements — expect INSUFFICIENT_EVIDENCE votes.`, tab: 'delivery' });
+  }
+  const seen = new Set<string>();
+  const unique = flags.filter((f) => { const k = `${f.projectId}|${f.milestoneId}|${f.text}`; if (seen.has(k)) return false; seen.add(k); return true; });
+  const rank = { critical: 0, warning: 1, info: 2 };
+  unique.sort((a, b) => rank[a.severity] - rank[b.severity]);
+
+  return { projects, reviewers, assignments, flags: unique };
+}));
+const money0 = (n: number) => `$${n.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+
 // ───────────────────────── analytics ─────────────────────────
 // Aggregates only over projects the signed-in user is a party to.
 api.get('/analytics', h((req) => {

@@ -40,7 +40,9 @@ Comparison projects: **Harbor Dental** (clear compliance → full payment) and *
 ## Architecture
 
 ```
-client/  React 19 + Vite + Tailwind · AG Grid/AG Charts (dashboards, ledgers, audit) · Bryntum Gantt (timeline)
+client/  React 19 + Vite + Tailwind · AG Grid/AG Charts (dashboards, ledgers, audit, analytics)
+         Bryntum Gantt: per-project timeline, cross-project delivery board (funding tranches as
+         predecessors of the work), expert-review triage resource view
 server/  Express 5 + TypeScript · JSON document store (server/data) · role-based access per project party
   services/sow.ts         SOW intelligence (AI or rule-based clause parser; never invents terms; flags ambiguity)
   services/kernel.ts      Kernel computer agent (@onkernel/sdk) | DEMO ADAPTER (static HTTP GET only)

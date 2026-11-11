@@ -1,0 +1,35 @@
+/* Board bar styling. Colours come from the validated categorical palette
+   (src/palette.ts): blue = work, aqua = funded, red = blocked, violet = under review.
+   Blocked bars also carry diagonal stripes so the state is never colour-alone. */
+
+.b-gantt-task.b-kind-work,
+.b-kind-work .b-gantt-task { background-color: #2a78d6; border-color: #2a78d6; }
+
+.b-gantt-task.b-kind-tranche,
+.b-kind-tranche .b-gantt-task { background-color: #1baf7a; border-color: #1baf7a; }
+
+.b-gantt-task.b-kind-project,
+.b-kind-project .b-gantt-task { background-color: #475569; border-color: #475569; }
+
+/* Blocked / at-risk: red plus stripes (secondary encoding for CVD and print). */
+.b-gantt-task.b-blocked,
+.b-blocked .b-gantt-task {
+  background-color: #e34948 !important;
+  border-color: #b91c1c !important;
+  background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.35) 0 4px, transparent 4px 8px);
+}
+
+.b-legend-blocked {
+  background-color: #e34948;
+  background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.35) 0 4px, transparent 4px 8px);
+}
+
+/* Scheduler event states */
+.b-gantt-task.b-state-waiting { background-color: #94a3b8; border-color: #64748b; }
+.b-gantt-task.b-state-active { background-color: #2a78d6; border-color: #2a78d6; }
+.b-gantt-task.b-state-done { background-color: #1baf7a; border-color: #1baf7a; }
+.b-gantt-task.b-state-review { background-color: #6250d6; border-color: #6250d6; }
+
+.b-note { opacity: 0.85; font-style: italic; }
+
+.b-gantt-task-content { font-size: 11px; }

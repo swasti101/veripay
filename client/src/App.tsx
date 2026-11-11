@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, lazy, Suspense, useContext, useEffect, useState, useCallback } from 'react';
 import { Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
 import { api } from './api';
 import { Spinner, SimTag } from './components/ui';
@@ -10,6 +10,7 @@ import Workspace from './pages/Workspace';
 import ExpertPortal from './pages/ExpertPortal';
 import Integrations from './pages/Integrations';
 import Analytics from './pages/Analytics';
+const Board = lazy(() => import('./pages/Board'));
 import NotificationBell from './components/NotificationBell';
 import VerifyEmail from './pages/VerifyEmail';
 import ResetPassword from './pages/ResetPassword';
@@ -55,6 +56,7 @@ export default function App() {
             <Route path="/join/:code" element={<JoinInvite />} />
             <Route path="/projects/:id/*" element={<Workspace />} />
             <Route path="/analytics" element={<Analytics />} />
+            <Route path="/board" element={<Suspense fallback={<div className="p-8"><Spinner label="Loading board…" /></div>}><Board /></Suspense>} />
             <Route path="/integrations" element={<Integrations />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
@@ -82,6 +84,7 @@ function TopBar() {
               <Pill ok={config.ai.configured} label={config.ai.configured ? 'AI: ' + config.ai.label.split(':')[0] : 'AI: heuristic'} />
             </Link>
           )}
+          {user.role !== 'expert' && <Link to="/board" className="btn-ghost hidden sm:inline-flex">Board</Link>}
           {user.role !== 'expert' && <Link to="/analytics" className="btn-ghost hidden sm:inline-flex">Analytics</Link>}
           {user.role !== 'expert' && <NotificationBell />}
           <span className={`rounded-full px-2 py-0.5 text-xs font-semibold text-white ${roleTone}`}>{user.role}</span>

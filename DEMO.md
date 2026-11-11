@@ -65,7 +65,7 @@ Everything the app does already works in a **labelled fallback** mode without an
 | **Kernel** | `KERNEL_API_KEY` (optional: `KERNEL_BASE_URL`) | Live headful Chromium inspection of submitted URLs — screenshots, responsive viewports, console errors, search probes. **Requires a public URL** for the deliverable (`PUBLIC_BASE_URL` on Render); Kernel cannot reach localhost | onkernel.com → dashboard → API key |
 | **AI / vision** (one of) | `ANTHROPIC_API_KEY` *(recommended: `ANTHROPIC_MODEL=claude-sonnet-5-5`)* or `GEMINI_API_KEY` | SOW extraction, vision analysis of screenshots, text analysis of reports, feedback classification, PM chat, expert vote simulator reasoning | console.anthropic.com or aistudio.google.com |
 | **APIMatic** | `APIMATIC_API_KEY` (plugin needs no key) | Three uses — see §2b: (1) PayPal calls already run through `@paypal/paypal-server-sdk`, the APIMatic-generated official SDK; (2) `npm run sdk:validate` / `sdk:generate` on our own OpenAPI spec; (3) the PayPal **Context Plugin** for AI coding agents | apimatic.io → account → API key · plugin: `npx context-plugins install paypal` |
-| **Bryntum Gantt** | — | Trial package already bundled (watermark). For a licensed build, change the alias in `client/package.json`: `"@bryntum/gantt": "npm:@bryntum/gantt@<version>"` | bryntum.com license |
+| **Bryntum Gantt** | — | Trial package bundled (watermark). Three views: per-project timeline, cross-project **delivery board** where funding tranches are real predecessors of the work, and an **expert-review triage** resource view. See §2d. | bryntum.com license |
 | **AG Grid / AG Charts** | — | Community editions — no key needed. 10 grids + 5 charts (see §2c) | — |
 | **SMTP (email)** | `SMTP_URL` (e.g. `smtp://user:pass@smtp.sendgrid.net:587`), `SMTP_FROM` | Real verification + password-reset emails. Without it the dev mailbox UI shows tokens so flows can be completed. | Any SMTP provider (SendGrid, SES, Postmark, Mailgun) |
 | **Render** | set everything above in Render dashboard; also `ALLOW_PUBLIC_DEMO=true` to permit the 0.0.0.0 bind, `PUBLIC_BASE_URL`, `DATA_DIR=/var/data` | Public deployment. `render.yaml` blueprint is at the repo root. | render.com → Blueprints → *New from repo* |
@@ -147,6 +147,47 @@ claude plugin install paypal --marketplace apimatic/context-plugins-installer --
 teams get 6 months of Business (Context Plugins + SDKs + a docs portal for their own API). Claim
 via APIMatic's form. If you claim it, say plainly which of the three uses above applied — (1) and
 (2) are already true of this codebase; (3) is only true once the plugin is installed and used.
+
+---
+
+## 2d. Bryntum — where it is used, and what we deliberately did not build
+
+Three views, all on the trial `@bryntum/gantt`:
+
+**1. Per-project timeline** (`Workspace → Timeline`) — milestones, their requirements, dependencies
+and the payment checkpoint at each due date.
+
+**2. Cross-project delivery board** (`/board → Delivery timeline`) — every project you are a party
+to on one Gantt. The point of this view: our product rule is *"work cannot begin on an unfunded
+milestone"*, so a **funding tranche is modelled as its own task and wired as a predecessor** of the
+milestone it pays for. An unpaid tranche therefore *visibly blocks the next phase* — striped red,
+with the dependency arrow showing what it is holding up. A PayPal authorization that lapses before
+its milestone is due is flagged on the bar, because it cannot be captured after that.
+
+**3. Expert-review triage** (`/board → Expert review triage`) — one parent row per reviewer, one bar
+per assigned review spanning invitation → close of voting, showing disputed amount, evidence
+readiness (`covered/total` requirements) and votes-in vs quorum. Bars are flagged when a review has
+a **deadline but no progress**: invited and never answered, accepted but never voted, or closing
+short of quorum — the last being the real failure mode, since it makes the panel INCONCLUSIVE and
+leaves the disputed amount frozen.
+
+A Bryntum **Scheduler** is the natural widget for view 3. We installed it, found that combining
+Scheduler with Gantt double-loads their shared Grid bundle and breaks the second to initialise, and
+that Bryntum's documented fix — the `*-thin` packages — is licence-gated (`npm i @bryntum/grid-thin`
+is refused without a licence). So view 3 is the same resource-vs-time view built on the trial Gantt,
+and is labelled as such in the UI rather than credited to Scheduler. The Scheduler dependency was
+removed rather than left unused.
+
+**Payment-event flags** (`/board`, top) are the agent-driven rescheduler, scoped deliberately: the
+AI PM detects unfunded-but-due milestones, lapsing authorizations, overdue phases and quorum risk,
+and **flags or proposes** — it never moves a date. Our baseline rule is that neither party can
+change agreed terms unilaterally, so an auto-reschedule would violate the product's core guarantee.
+The same detections post into the project conversation via `coordinate()` in `services/pm.ts`.
+
+**Not built: a subscription revenue radar.** It was considered and rejected — VeriPay has no
+recurring billing. Money is one-off milestone tranches plus a per-release platform fee. Building a
+renewals/failed-payment timeline would have meant inventing a subscription business we do not have
+in order to fill a Scheduler row.
 
 ---
 
