@@ -3,7 +3,26 @@ import { themeQuartz, type ColDef } from 'ag-grid-community';
 import { Badge } from './ui';
 import { money, dt } from '../api';
 
-const theme = themeQuartz.withParams({ fontSize: 13, headerFontSize: 12, rowHeight: 38, headerHeight: 36, borderRadius: 8, wrapperBorderRadius: 10, accentColor: '#4f46e5' });
+// Grids are ledgers here: square shoulders, hairline rules, tabular figures.
+const theme = themeQuartz.withParams({
+  fontFamily: 'IBM Plex Sans, system-ui, sans-serif',
+  fontSize: 13,
+  headerFontSize: 12,
+  headerFontWeight: 500,
+  rowHeight: 36,
+  headerHeight: 34,
+  borderRadius: 2,
+  wrapperBorderRadius: 2,
+  accentColor: '#8c2f39',
+  backgroundColor: '#ffffff',
+  foregroundColor: '#1a1f2e',
+  headerBackgroundColor: '#f6f7f9',
+  headerTextColor: '#6b7489',
+  borderColor: '#dfe3ea',
+  oddRowBackgroundColor: '#ffffff',
+  rowHoverColor: '#f6f7f9',
+  selectedRowBackgroundColor: '#f8eef0',
+});
 
 export const badgeCell = (p: any) => (p.value ? <Badge>{String(p.value)}</Badge> : '—');
 export const moneyCell = (p: any) => (p.value === undefined || p.value === null ? '—' : money(p.value));

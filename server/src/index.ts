@@ -37,12 +37,16 @@ app.use((_, res, next) => {
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), interest-cohort=()');
   if (prod) res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-  // CSP allows PayPal Buttons SDK (www.paypal.com) and the UI's bundled assets. Adjust if you add providers.
+  // CSP allows the PayPal Buttons SDK and nothing else third-party.
+  // The SDK talks to api-m.* for orders AND www.* for its own telemetry/logger, so both are
+  // needed under connect-src — with only api.* the buttons render but log CSP violations.
+  const PP = 'https://www.paypal.com https://www.sandbox.paypal.com https://www.paypalobjects.com ' +
+    'https://api-m.paypal.com https://api-m.sandbox.paypal.com';
   res.setHeader('Content-Security-Policy',
     "default-src 'self'; " +
-    "script-src 'self' https://www.paypal.com https://www.paypalobjects.com 'unsafe-inline'; " +
-    "frame-src https://www.paypal.com https://www.sandbox.paypal.com; " +
-    "connect-src 'self' https://api.paypal.com https://api.sandbox.paypal.com; " +
+    `script-src 'self' ${PP} 'unsafe-inline'; ` +
+    `frame-src 'self' ${PP}; ` +
+    `connect-src 'self' ${PP}; ` +
     "img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; " +
     "object-src 'none'; base-uri 'self'; form-action 'self'");
   next();

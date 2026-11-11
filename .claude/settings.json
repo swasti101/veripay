@@ -1,5 +1,6 @@
 {
   "enabledPlugins": {
-    "paypal@context-plugins": true
+    "paypal@context-plugins": true,
+    "frontend-design@anthropic-plugin-directory": true
   }
 }

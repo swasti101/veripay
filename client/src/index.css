@@ -1,13 +1,104 @@
 @import "tailwindcss";
 
-@utility card { @apply bg-white rounded-xl border border-slate-200 shadow-sm; }
-@utility btn { @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed; }
-@utility btn-primary { @apply btn bg-indigo-600 text-white hover:bg-indigo-700; }
-@utility btn-secondary { @apply btn bg-white text-slate-700 border border-slate-300 hover:bg-slate-50; }
-@utility btn-success { @apply btn bg-emerald-600 text-white hover:bg-emerald-700; }
-@utility btn-danger { @apply btn bg-rose-600 text-white hover:bg-rose-700; }
-@utility btn-ghost { @apply btn text-slate-600 hover:bg-slate-100; }
-@utility input { @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500; }
-@utility label { @apply block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1; }
-@utility h2 { @apply text-lg font-semibold text-slate-900; }
-@utility muted { @apply text-sm text-slate-500; }
+/* Self-hosted so there is no third-party request and the CSP stays tight. */
+@import "@fontsource/source-serif-4/400.css";
+@import "@fontsource/source-serif-4/600.css";
+@import "@fontsource/source-serif-4/400-italic.css";
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+
+/* ───────────────────────────────────────────────────────────────
+   VeriPay design tokens.
+
+   The subject is a financial instrument, not a social marketplace: money moves
+   because a contract clause was satisfied and a panel voted. So the register is
+   a signed agreement and a ledger — authority (oxblood), settlement (teal),
+   and hairlines that separate records rather than decorate panels.
+   ─────────────────────────────────────────────────────────────── */
+@theme {
+  --color-ink: #1a1f2e;          /* deep blue-black with real chroma */
+  --color-ink-2: #3d4659;        /* secondary text */
+  --color-ink-3: #6b7489;        /* tertiary / meta */
+  --color-paper: #f6f7f9;        /* cool document white */
+  --color-surface: #ffffff;
+  --color-rule: #dfe3ea;         /* hairline */
+  --color-rule-strong: #c3cad6;
+
+  --color-seal: #8c2f39;         /* authority: verdicts, primary action */
+  --color-seal-ink: #6d2029;
+  --color-seal-wash: #f8eef0;
+
+  --color-released: #0f766e;     /* money paid / compliant */
+  --color-released-wash: #e6f2f1;
+  --color-hold: #b45309;         /* under review / partial */
+  --color-hold-wash: #fcf1e3;
+  --color-refuse: #b3261e;       /* failed / non-compliant */
+  --color-refuse-wash: #fbeceb;
+  --color-panel: #4c3a8c;        /* expert review / clarification */
+  --color-panel-wash: #efecf8;
+
+  --font-display: "Source Serif 4", Georgia, serif;
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+@layer base {
+  html { -webkit-font-smoothing: antialiased; }
+  body {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  /* Money and counts must align down a column. */
+  .tnum, table td, table th { font-variant-numeric: tabular-nums; }
+  h1, h2, h3 { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.01em; }
+  :focus-visible { outline: 2px solid var(--color-seal); outline-offset: 2px; }
+  ::selection { background: var(--color-seal-wash); }
+}
+
+/* ── Surfaces ─────────────────────────────────────────────────── */
+/* A "sheet" is a document panel: square-shouldered, hairline-bounded, no drop
+   shadow. Shadow is reserved for things that genuinely float (menus, dialogs),
+   so elevation still means something. */
+@utility sheet { @apply bg-surface border border-rule rounded-[3px]; }
+@utility sheet-pad { @apply bg-surface border border-rule rounded-[3px] p-4; }
+@utility card { @apply bg-surface border border-rule rounded-[3px]; }
+
+/* ── Type roles ───────────────────────────────────────────────── */
+@utility h1 { font-family: var(--font-display); @apply text-[26px] leading-tight font-semibold text-ink; }
+@utility h2 { font-family: var(--font-display); @apply text-[17px] leading-snug font-semibold text-ink; }
+/* Sentence case, not tracked-out all-caps — that treatment is a template tell. */
+@utility field-label { @apply block text-[12px] font-medium text-ink-3 mb-1; }
+@utility label { @apply block text-[12px] font-medium text-ink-3 mb-1; }
+@utility meta { @apply text-[12px] text-ink-3; }
+@utility muted { @apply text-[13px] text-ink-2; }
+@utility mono { font-family: var(--font-mono); @apply text-[12px]; }
+
+/* ── Controls ─────────────────────────────────────────────────── */
+@utility btn {
+  @apply inline-flex items-center justify-center gap-1.5 rounded-[3px] px-3 py-[7px]
+         text-[13px] font-medium transition-colors cursor-pointer
+         disabled:opacity-45 disabled:cursor-not-allowed;
+}
+@utility btn-primary { @apply btn bg-seal text-white hover:bg-seal-ink; }
+@utility btn-secondary { @apply btn bg-surface text-ink border border-rule-strong hover:bg-paper; }
+@utility btn-success { @apply btn bg-released text-white hover:brightness-90; }
+@utility btn-danger { @apply btn bg-refuse text-white hover:brightness-90; }
+@utility btn-ghost { @apply btn text-ink-2 hover:bg-paper hover:text-ink; }
+@utility input {
+  @apply w-full rounded-[3px] border border-rule-strong bg-surface px-2.5 py-[7px] text-[13px] text-ink
+         placeholder:text-ink-3 focus:outline-none focus:border-seal focus:ring-1 focus:ring-seal;
+}
+
+/* ── Ledger rows ──────────────────────────────────────────────── */
+/* Records are separated by rules, not boxed individually. Square corners here
+   is the point: a row is part of a continuous record, not its own card. */
+@utility ledger { @apply divide-y divide-rule; }
+@utility ledger-row { @apply flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-paper; }
+
+/* The money rail: amounts stacked so committed → eligible → paid reads downward. */
+@utility rail-figure { @apply flex items-baseline justify-between gap-3 py-2 border-b border-rule last:border-0; }

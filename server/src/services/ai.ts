@@ -4,10 +4,32 @@
 
 export interface ImageInput { mime: string; base64: string }
 
-export function aiProvider(): { name: string; model: string } | null {
-  if (process.env.ANTHROPIC_API_KEY) return { name: 'anthropic', model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5' };
-  if (process.env.GEMINI_API_KEY) return { name: 'gemini', model: process.env.GEMINI_MODEL || 'gemini-2.5-flash' };
-  return null;
+export type ProviderName = 'anthropic' | 'gemini' | 'groq';
+
+// Groq is OpenAI-compatible. Its text models have no image input, so when a call carries
+// screenshots we switch to a vision-capable Groq model for that call only.
+const GROQ_TEXT_DEFAULT = 'llama-3.3-70b-versatile';
+const GROQ_VISION_DEFAULT = 'qwen/qwen3.8-27b';
+
+/** Which provider answers. AI_PROVIDER pins one explicitly; otherwise first key present wins. */
+export function aiProvider(opts: { vision?: boolean } = {}): { name: ProviderName; model: string } | null {
+  const pin = (process.env.AI_PROVIDER || '').toLowerCase() as ProviderName | '';
+  const have = {
+    anthropic: !!process.env.ANTHROPIC_API_KEY,
+    gemini: !!process.env.GEMINI_API_KEY,
+    groq: !!process.env.GROQ_API_KEY,
+  };
+  const order: ProviderName[] = pin && have[pin] ? [pin] : (['anthropic', 'gemini', 'groq'] as ProviderName[]).filter((p) => have[p]);
+  const pick = order[0];
+  if (!pick) return null;
+  if (pick === 'anthropic') return { name: 'anthropic', model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5' };
+  if (pick === 'gemini') return { name: 'gemini', model: process.env.GEMINI_MODEL || 'gemini-2.5-flash' };
+  return {
+    name: 'groq',
+    model: opts.vision
+      ? process.env.GROQ_VISION_MODEL || GROQ_VISION_DEFAULT
+      : process.env.GROQ_MODEL || GROQ_TEXT_DEFAULT,
+  };
 }
 
 export function aiLabel() {
@@ -17,7 +39,7 @@ export function aiLabel() {
 
 /** Ask the model for JSON. Returns null when no provider is configured or the call fails. */
 export async function aiJSON<T = any>(system: string, user: string, images: ImageInput[] = [], maxTokens = 4000): Promise<{ data: T; source: string } | null> {
-  const p = aiProvider();
+  const p = aiProvider({ vision: images.length > 0 });
   if (!p) return null;
   const instruction = `${user}\n\nRespond with a single valid JSON object only. No markdown fences, no commentary.`;
   try {
@@ -33,6 +55,24 @@ export async function aiJSON<T = any>(system: string, user: string, images: Imag
       if (!r.ok) throw new Error(`Anthropic ${r.status}: ${(await r.text()).slice(0, 300)}`);
       const j: any = await r.json();
       text = (j.content || []).filter((c: any) => c.type === 'text').map((c: any) => c.text).join('');
+    } else if (p.name === 'groq') {
+      // OpenAI-compatible Chat Completions. Vision models take up to 3 images; each costs
+      // ~2048 input tokens, so the cap is deliberate rather than arbitrary.
+      const content: any[] = [{ type: 'text', text: instruction }];
+      for (const im of images.slice(0, 3)) content.push({ type: 'image_url', image_url: { url: `data:${im.mime};base64,${im.base64}` } });
+      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${process.env.GROQ_API_KEY}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          model: p.model,
+          max_completion_tokens: maxTokens,
+          response_format: { type: 'json_object' },
+          messages: [{ role: 'system', content: system }, { role: 'user', content: images.length ? content : instruction }],
+        }),
+      });
+      if (!r.ok) throw new Error(`Groq ${r.status}: ${(await r.text()).slice(0, 300)}`);
+      const j: any = await r.json();
+      text = j.choices?.[0]?.message?.content || '';
     } else {
       const parts: any[] = images.slice(0, 6).map((im) => ({ inline_data: { mime_type: im.mime, data: im.base64 } }));
       parts.push({ text: instruction });

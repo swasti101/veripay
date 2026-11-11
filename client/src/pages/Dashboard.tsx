@@ -4,17 +4,16 @@ import { AgCharts } from 'ag-charts-react';
 import { api, money, d } from '../api';
 import { useApp } from '../App';
 import Grid, { badgeCell, moneyCell, dateCell } from '../components/Grid';
-import { Badge, Empty, Section, SimTag, Spinner, Stat, ErrorNote, useAction } from '../components/ui';
+import { Badge, Empty, ErrorNote, Figure, Section, SimTag, Spinner, useAction } from '../components/ui';
+import { SERIES, TEXT } from '../palette';
 
-import { SERIES } from '../palette';
-
-// Categorical slots 1–3 of the validated palette (all-pairs safe in light mode).
 const C = { committed: SERIES.s1, review: SERIES.s2, paid: SERIES.s3 };
 
 export default function Dashboard() {
   const { user } = useApp();
   const [data, setData] = useState<any>(null);
   const [code, setCode] = useState('');
+  const [filter, setFilter] = useState<'all' | 'needs-me' | 'active' | 'done'>('all');
   const nav = useNavigate();
   const a = useAction();
   useEffect(() => { a.run(async () => setData(await api.get('/dashboard'))); }, []);
@@ -24,118 +23,181 @@ export default function Dashboard() {
     const s = (k: string) => p.reduce((x: number, r: any) => x + (r[k] || 0), 0);
     return { committed: s('committed'), paid: s('paid'), eligible: s('eligible'), underReview: s('underReview'), authorized: s('authorized') };
   }, [data]);
-  if (!data) return <div className="p-8">{a.error ? <ErrorNote error={a.error} /> : <Spinner label="Loading dashboard…" />}</div>;
 
-  const pending = data.projects.flatMap((p: any) => p.pending.map((x: any) => ({ project: p.title, id: p.id, action: x.action, tab: x.tab })));
-  const chartData = data.projects.map((p: any) => ({ project: p.title.split('—')[0].trim(), paid: p.paid, review: p.underReview, committed: Math.max(0, p.committed - p.paid - p.underReview) }));
-  const fundingCounts = Object.entries(data.milestones.reduce((acc: any, m: any) => { acc[m.fundingStatus || 'FUNDING_REQUIRED'] = (acc[m.fundingStatus || 'FUNDING_REQUIRED'] || 0) + 1; return acc; }, {})).map(([status, count]) => ({ status: status.replace(/_/g, ' '), count }));
+  if (!data) return <main className="mx-auto max-w-[1400px] px-5 py-8">{a.error ? <ErrorNote error={a.error} /> : <Spinner label="Loading your projects…" />}</main>;
+
   const isClient = user.role === 'client';
+  const pending = data.projects.flatMap((p: any) => p.pending.map((x: any) => ({ project: p.title, id: p.id, action: x.action, tab: x.tab })));
+  const shown = data.projects.filter((p: any) =>
+    filter === 'all' ? true
+      : filter === 'needs-me' ? p.pending.length > 0
+        : filter === 'active' ? p.status !== 'COMPLETED' : p.status === 'COMPLETED');
+  const chartData = data.projects.map((p: any) => ({
+    project: p.title.split('—')[0].trim(), paid: p.paid, review: p.underReview,
+    committed: Math.max(0, p.committed - p.paid - p.underReview),
+  }));
 
   return (
-    <main className="mx-auto max-w-7xl space-y-5 px-4 py-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <main className="mx-auto max-w-[1400px] px-5 py-6">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">{isClient ? 'Client dashboard' : 'Freelancer dashboard'}</h1>
-          <p className="muted">{isClient ? 'Projects you fund, approvals waiting on you, and where your money is.' : 'Projects you deliver, what is funded, and what you have earned.'}</p>
+          <h1 className="h1">{isClient ? 'Projects you are funding' : 'Projects you are delivering'}</h1>
+          <p className="mt-0.5 text-[13px] text-ink-2">
+            {isClient
+              ? 'What you have committed, what is waiting on your approval, and where the money stands.'
+              : 'What is funded, what you owe next, and what you have earned.'}
+          </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Link to="/board" className="btn-secondary">Delivery board</Link>
-          <Link to="/analytics" className="btn-secondary">Analytics</Link>
-          <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (code.trim()) nav(`/join/${code.trim().toUpperCase()}`); }}>
-            <input className="input w-40" placeholder="Invite code" value={code} onChange={(e) => setCode(e.target.value)} />
+        <div className="flex flex-wrap items-center gap-2">
+          <form className="flex gap-1.5" onSubmit={(e) => { e.preventDefault(); if (code.trim()) nav(`/join/${code.trim().toUpperCase()}`); }}>
+            <input className="input w-36" placeholder="Invite code" value={code} onChange={(e) => setCode(e.target.value)} />
             <button className="btn-secondary" disabled={!code.trim()}>Join</button>
           </form>
-          <Link to="/new" className="btn-primary">+ New project</Link>
+          <Link to="/new" className="btn-primary">Start a project</Link>
         </div>
-      </div>
-
-      <div className="card grid grid-cols-2 gap-4 p-4 md:grid-cols-5">
-        <Stat label="Active projects" value={data.projects.filter((p: any) => p.status !== 'COMPLETED').length} sub={`${data.projects.length} total`} />
-        <Stat label={isClient ? 'Committed' : 'Committed to you'} value={money(totals.committed)} sub="per approved funding plans" />
-        <Stat label="Authorized (unreleased)" value={money(totals.authorized)} sub="PayPal authorizations" />
-        <Stat label="Eligible for release" value={money(totals.eligible)} tone="text-emerald-700" sub="awaiting approvals" />
-        <Stat label={isClient ? 'Paid out' : 'Earned (paid)'} value={money(totals.paid)} sub={`${money(totals.underReview)} under review`} />
       </div>
 
       {data.projects.length === 0 ? (
-        <Empty title="No projects yet">Create a project and upload a SOW, or join one with an invite code.</Empty>
+        <Empty title="No projects yet">
+          Start one and upload the Statement of Work, or join a project you were invited to with its code.
+        </Empty>
       ) : (
-        <>
-          <div className="grid gap-5 lg:grid-cols-3">
-            <Section title="Pending approvals & actions" className="lg:col-span-1">
-              {pending.length === 0 ? <p className="muted">Nothing is waiting on you.</p> : (
-                <ul className="divide-y divide-slate-100">
-                  {pending.map((p: any, i: number) => (
-                    <li key={i} className="py-1">
-                      <Link to={`/projects/${p.id}/${p.tab}`} className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 transition hover:bg-indigo-50">
-                        <span className="min-w-0"><span className="block text-sm font-medium text-slate-800">{p.action}</span><span className="block truncate text-xs text-slate-500">{p.project}</span></span>
-                        <span className="btn-secondary shrink-0" aria-hidden="true">Open</span>
-                      </Link>
-                    </li>
+        <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
+          {/* ── Main column: the project record ── */}
+          <div className="min-w-0 space-y-5">
+            <div className="sheet">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-rule px-4 py-2.5">
+                <h2 className="h2">Projects</h2>
+                <div className="flex gap-0.5">
+                  {([['all', 'All'], ['needs-me', `Needs you${pending.length ? ` (${pending.length})` : ''}`], ['active', 'Active'], ['done', 'Completed']] as const).map(([k, l]) => (
+                    <button key={k} onClick={() => setFilter(k)}
+                      className={`rounded-[3px] px-2 py-1 text-[12px] transition-colors ${filter === k ? 'bg-paper font-medium text-ink' : 'text-ink-3 hover:text-ink'}`}>{l}</button>
                   ))}
-                </ul>
+                </div>
+              </div>
+
+              {shown.length === 0 ? (
+                <p className="px-4 py-8 text-center text-[13px] text-ink-3">Nothing matches that filter.</p>
+              ) : (
+                <div className="ledger">
+                  {shown.map((p: any) => {
+                    const pctPaid = p.committed > 0 ? Math.min(100, (p.paid / p.committed) * 100) : 0;
+                    const pctReview = p.committed > 0 ? Math.min(100 - pctPaid, (p.underReview / p.committed) * 100) : 0;
+                    return (
+                      <Link key={p.id} to={`/projects/${p.id}`} className="block px-4 py-3 transition-colors hover:bg-paper">
+                        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1.5">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="truncate text-[14px] font-medium text-ink">{p.title}</span>
+                              <Badge>{p.status}</Badge>
+                              {p.isDemo && <SimTag label={p.demoLabel ? p.demoLabel.toLowerCase() : 'demo'} />}
+                            </div>
+                            <div className="mt-0.5 text-[12px] text-ink-3">
+                              {isClient ? 'Freelancer' : 'Client'} {p.counterpart} · {p.currentMilestone}
+                              {p.nextDeadline ? ` · next deadline ${d(p.nextDeadline)}` : ''}
+                            </div>
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <div className="text-[15px] font-semibold tabular-nums text-ink" style={{ fontFamily: 'var(--font-display)' }}>{money(p.paid)}</div>
+                            <div className="text-[11px] text-ink-3">of {money(p.committed)} committed</div>
+                          </div>
+                        </div>
+
+                        {/* The bar is the record, not decoration: paid / held / committed-not-released. */}
+                        <div className="mt-2 flex h-1 w-full overflow-hidden rounded-[1px] bg-rule">
+                          <span style={{ width: `${pctPaid}%`, background: C.paid }} />
+                          <span style={{ width: `${pctReview}%`, background: C.review }} />
+                        </div>
+
+                        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ink-3">
+                          <span>{p.milestonesDone}/{p.milestonesTotal} milestones accepted</span>
+                          <span>Work <Badge>{String(p.currentWork)}</Badge></span>
+                          <span>Funding <Badge>{String(p.currentFunding)}</Badge></span>
+                          {p.expertReview !== 'NONE' && <span>Panel <Badge>{String(p.expertReview)}</Badge></span>}
+                          {p.underReview > 0 && <span className="text-hold">{money(p.underReview)} held under review</span>}
+                          {p.pending.length > 0 && <span className="font-medium text-seal">{p.pending.length} waiting on you</span>}
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
               )}
+            </div>
+
+            <Section title="Milestones and deadlines">
+              <Grid rows={data.milestones} height={300} onRowClicked={(r: any) => nav(`/projects/${r.projectId}`)} cols={[
+                { field: 'project', minWidth: 190 }, { field: 'id', headerName: 'MS', maxWidth: 70 }, { field: 'title', minWidth: 150 },
+                { field: 'dueDate', headerName: 'Due', valueFormatter: (p: any) => d(p.value), maxWidth: 120, sort: 'asc' },
+                { field: 'amount', cellRenderer: moneyCell, maxWidth: 100 },
+                { field: 'workStatus', headerName: 'Work', cellRenderer: badgeCell },
+                { field: 'fundingStatus', headerName: 'Funding', cellRenderer: badgeCell },
+                { field: 'paid', cellRenderer: moneyCell, maxWidth: 100 },
+              ]} />
             </Section>
-            <Section title="Money by project" className="lg:col-span-2">
-              <div style={{ height: 240 }}>
+
+            <Section title={isClient ? 'Payment history' : 'Earnings and payment history'}
+              actions={data.transactions.some((t: any) => t.mode === 'SIMULATED') && <SimTag label="contains simulated entries" />}>
+              <Grid rows={[...data.transactions].reverse()} height={320} pagination cols={[
+                { field: 'createdAt', headerName: 'When', cellRenderer: dateCell, minWidth: 160 },
+                { field: 'project', minWidth: 180 }, { field: 'type', cellRenderer: badgeCell, minWidth: 180 },
+                { field: 'milestoneId', headerName: 'MS', maxWidth: 70 },
+                { field: 'amount', cellRenderer: moneyCell, maxWidth: 110 },
+                { field: 'status', cellRenderer: badgeCell },
+                { field: 'mode', cellRenderer: (q: any) => (q.value === 'SIMULATED' ? <SimTag /> : <Badge tone="released">{q.value}</Badge>) },
+              ]} />
+            </Section>
+          </div>
+
+          {/* ── Money rail: always on screen, because that is the product's point ── */}
+          <aside className="space-y-5">
+            <div className="sheet">
+              <div className="border-b border-rule px-4 py-2.5"><h2 className="h2">Where the money stands</h2></div>
+              <div className="px-4 py-1">
+                <Figure label={isClient ? 'Committed' : 'Committed to you'} value={money(totals.committed)} sub="under approved funding plans" />
+                <Figure label="Authorized, not released" value={money(totals.authorized)} sub="held by PayPal authorization" />
+                <Figure label="Eligible for release" value={money(totals.eligible)} tone="text-released" sub="awaiting approvals" />
+                <Figure label="Held under review" value={money(totals.underReview)} tone="text-hold" sub="disputed or pending a panel" />
+                <Figure label={isClient ? 'Paid out' : 'Earned'} value={money(totals.paid)} tone="text-ink" />
+              </div>
+            </div>
+
+            <div className="sheet">
+              <div className="border-b border-rule px-4 py-2.5">
+                <h2 className="h2">Waiting on you{pending.length > 0 && <span className="ml-1.5 text-[13px] font-normal text-seal">{pending.length}</span>}</h2>
+              </div>
+              {pending.length === 0 ? (
+                <p className="px-4 py-6 text-center text-[13px] text-ink-3">Nothing needs your decision right now.</p>
+              ) : (
+                <div className="ledger">
+                  {pending.map((p: any, i: number) => (
+                    <Link key={i} to={`/projects/${p.id}/${p.tab}`} className="block px-4 py-2.5 transition-colors hover:bg-paper">
+                      <div className="text-[13px] font-medium text-ink">{p.action}</div>
+                      <div className="truncate text-[11px] text-ink-3">{p.project}</div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <Section title="Money by project">
+              <div style={{ height: 200 }}>
                 <AgCharts options={{
                   data: chartData, background: { visible: false },
                   series: [
-                    { type: 'bar', direction: 'horizontal', xKey: 'project', yKey: 'paid', yName: 'Paid', stacked: true, fill: C.paid, cornerRadius: 4 },
-                    { type: 'bar', direction: 'horizontal', xKey: 'project', yKey: 'review', yName: 'Under review / held', stacked: true, fill: C.review },
-                    { type: 'bar', direction: 'horizontal', xKey: 'project', yKey: 'committed', yName: 'Committed, not yet released', stacked: true, fill: C.committed },
+                    { type: 'bar', direction: 'horizontal', xKey: 'project', yKey: 'paid', yName: 'Paid', stacked: true, fill: C.paid, cornerRadius: 2, stroke: '#fff', strokeWidth: 2 },
+                    { type: 'bar', direction: 'horizontal', xKey: 'project', yKey: 'review', yName: 'Held', stacked: true, fill: C.review, stroke: '#fff', strokeWidth: 2 },
+                    { type: 'bar', direction: 'horizontal', xKey: 'project', yKey: 'committed', yName: 'Not yet released', stacked: true, fill: C.committed, stroke: '#fff', strokeWidth: 2 },
                   ] as any,
-                  axes: { x: { type: 'number', position: 'bottom', label: { formatter: (p: any) => money(p.value) } }, y: { type: 'category', position: 'left' } } as any,
-                  legend: { position: 'bottom' },
+                  axes: [
+                    { type: 'category', position: 'left', label: { color: TEXT.muted, fontSize: 11 } },
+                    { type: 'number', position: 'bottom', label: { color: TEXT.muted, fontSize: 11, formatter: (p: any) => money(p.value) } },
+                  ] as any,
+                  legend: { position: 'bottom', item: { label: { color: TEXT.secondary, fontSize: 11 } } },
                 }} />
               </div>
             </Section>
-          </div>
-
-          <Section title="Projects">
-            <Grid rows={data.projects} height={260} onRowClicked={(r: any) => nav(`/projects/${r.id}`)} cols={[
-              { field: 'title', headerName: 'Project', minWidth: 240, cellRenderer: (p: any) => <span className="font-medium">{p.value} {p.data.isDemo && <SimTag label="DEMO" />}</span> },
-              { field: 'status', cellRenderer: badgeCell, maxWidth: 130 },
-              { field: 'counterpart', headerName: isClient ? 'Freelancer' : 'Client' },
-              { field: 'currentMilestone', headerName: 'Current milestone' },
-              { field: 'currentWork', headerName: 'Work', cellRenderer: badgeCell },
-              { field: 'currentFunding', headerName: 'Funding', cellRenderer: badgeCell },
-              { field: 'nextDeadline', headerName: 'Next deadline', valueFormatter: (p: any) => d(p.value), maxWidth: 140 },
-              { headerName: 'Done', valueGetter: (p: any) => `${p.data.milestonesDone}/${p.data.milestonesTotal}`, maxWidth: 90 },
-              { field: 'expertReview', headerName: 'Expert review', cellRenderer: badgeCell },
-              { field: 'paid', headerName: 'Paid', cellRenderer: moneyCell, maxWidth: 120 },
-            ]} />
-          </Section>
-
-          <div className="grid gap-5 lg:grid-cols-3">
-            <Section title="Milestones & deadlines" className="lg:col-span-2">
-              <Grid rows={data.milestones} height={300} onRowClicked={(r: any) => nav(`/projects/${r.projectId}`)} cols={[
-                { field: 'project', minWidth: 200 }, { field: 'id', headerName: 'MS', maxWidth: 80 }, { field: 'title', minWidth: 160 },
-                { field: 'dueDate', headerName: 'Due', valueFormatter: (p: any) => d(p.value), maxWidth: 130, sort: 'asc' },
-                { field: 'amount', cellRenderer: moneyCell, maxWidth: 110 }, { field: 'workStatus', headerName: 'Work', cellRenderer: badgeCell },
-                { field: 'fundingStatus', headerName: 'Funding', cellRenderer: badgeCell }, { field: 'paid', cellRenderer: moneyCell, maxWidth: 110 },
-              ]} />
-            </Section>
-            <Section title="Milestones by funding status">
-              <div style={{ height: 300 }}>
-                <AgCharts options={{
-                  data: fundingCounts, background: { visible: false },
-                  series: [{ type: 'bar', direction: 'horizontal', xKey: 'status', yKey: 'count', yName: 'Milestones', fill: C.committed, cornerRadius: 4, label: { enabled: true, placement: 'outside-end' } }] as any,
-                  axes: { x: { type: 'number', position: 'bottom', interval: { step: 1 } }, y: { type: 'category', position: 'left' } } as any,
-                  legend: { enabled: false },
-                }} />
-              </div>
-            </Section>
-          </div>
-
-          <Section title={isClient ? 'Payment history' : 'Earnings & payment history'} actions={data.transactions.some((t: any) => t.mode === 'SIMULATED') && <SimTag label="contains SIMULATED transactions" />}>
-            <Grid rows={[...data.transactions].reverse()} height={320} pagination cols={[
-              { field: 'createdAt', headerName: 'When', cellRenderer: dateCell, minWidth: 170 }, { field: 'project', minWidth: 200 }, { field: 'type', cellRenderer: badgeCell, minWidth: 190 },
-              { field: 'milestoneId', headerName: 'MS', maxWidth: 80 }, { field: 'amount', cellRenderer: moneyCell, maxWidth: 120 }, { field: 'status', cellRenderer: badgeCell },
-              { field: 'mode', cellRenderer: (p: any) => (p.value === 'SIMULATED' ? <SimTag /> : <Badge tone="green">{p.value}</Badge>) },
-            ]} />
-          </Section>
-        </>
+          </aside>
+        </div>
       )}
     </main>
   );

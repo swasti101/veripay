@@ -20,7 +20,14 @@ export const api = {
   patch: <T = any>(p: string, b?: any) => call<T>('PATCH', p, b ?? {}),
 };
 
-export const money = (n: number | null | undefined, cur = 'USD') =>
-  n === null || n === undefined || isNaN(n) ? '—' : new Intl.NumberFormat('en-US', { style: 'currency', currency: cur, maximumFractionDigits: 2 }).format(n);
+export const money = (n: number | null | undefined, cur = 'USD') => {
+  if (n === null || n === undefined || isNaN(n)) return '—';
+  // Show cents only when there are cents — whole amounts read cleaner down a column.
+  const whole = Math.abs(n % 1) < 0.005;
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency', currency: cur,
+    minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2,
+  }).format(n);
+};
 export const dt = (s?: string | null) => (s ? new Date(s).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—');
 export const d = (s?: string | null) => (s ? new Date(s).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '—');

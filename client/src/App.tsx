@@ -1,5 +1,5 @@
 import { createContext, lazy, Suspense, useContext, useEffect, useState, useCallback } from 'react';
-import { Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Link, NavLink, useNavigate } from 'react-router-dom';
 import { api } from './api';
 import { Spinner, SimTag } from './components/ui';
 import Login from './pages/Login';
@@ -68,32 +68,59 @@ export default function App() {
 
 function TopBar() {
   const { user, config, logout } = useApp();
-  const roleTone = user.role === 'client' ? 'bg-sky-600' : user.role === 'freelancer' ? 'bg-emerald-600' : 'bg-violet-600';
+  const nav = [
+    ...(user.role !== 'expert' ? [['/', 'Projects'], ['/board', 'Delivery board'], ['/analytics', 'Analytics']] : [['/', 'My reviews']]),
+  ] as [string, string][];
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-2.5">
-        <Link to="/" className="flex items-center gap-2 font-bold text-slate-900">
-          <span className="grid h-7 w-7 place-items-center rounded-lg bg-indigo-600 text-sm text-white">V</span> VeriPay
+    <header className="sticky top-0 z-30 border-b border-rule bg-surface">
+      <div className="mx-auto flex max-w-[1400px] items-center gap-5 px-5 py-2.5">
+        {/* Wordmark: the seal mark carries the "verdict" idea the product is built on. */}
+        <Link to="/" className="flex shrink-0 items-center gap-2">
+          <span className="grid h-6 w-6 place-items-center rounded-[2px] bg-seal text-[13px] font-semibold text-white" style={{ fontFamily: 'var(--font-display)' }}>V</span>
+          <span className="text-[16px] font-semibold tracking-tight text-ink" style={{ fontFamily: 'var(--font-display)' }}>VeriPay</span>
         </Link>
-        <span className="hidden text-xs text-slate-500 md:inline">SOW-based delivery verification & milestone payments</span>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          {config && (
-            <Link to="/integrations" className="hidden items-center gap-1 text-[11px] sm:flex" title="Integration status">
-              <Pill ok={config.paypal.mode !== 'SIMULATED'} label={config.paypal.mode === 'SIMULATED' ? 'PayPal: SIMULATED' : `PayPal: ${config.paypal.mode.replace('PAYPAL_', '')}`} />
-              <Pill ok={config.kernel.configured} label={config.kernel.configured ? 'Kernel: live' : 'Kernel: demo adapter'} />
-              <Pill ok={config.ai.configured} label={config.ai.configured ? 'AI: ' + config.ai.label.split(':')[0] : 'AI: heuristic'} />
-            </Link>
-          )}
-          {user.role !== 'expert' && <Link to="/board" className="btn-ghost hidden sm:inline-flex">Board</Link>}
-          {user.role !== 'expert' && <Link to="/analytics" className="btn-ghost hidden sm:inline-flex">Analytics</Link>}
+
+        <nav className="hidden items-center gap-1 md:flex">
+          {nav.map(([to, label]) => (
+            <NavLink key={to} to={to} end={to === '/'}
+              className={({ isActive }) => `rounded-[3px] px-2.5 py-1.5 text-[13px] transition-colors ${isActive ? 'bg-paper font-medium text-ink' : 'text-ink-2 hover:text-ink'}`}>
+              {label}
+            </NavLink>
+          ))}
+        </nav>
+
+        <div className="ml-auto flex items-center gap-3">
+          {config && <IntegrationStrip config={config} />}
           {user.role !== 'expert' && <NotificationBell />}
-          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold text-white ${roleTone}`}>{user.role}</span>
-          <span className="text-sm text-slate-700">{user.name}</span>
-          {user.isDemo && <SimTag label="DEMO" />}
-          <button className="btn-ghost" onClick={logout}>Switch user</button>
+          <div className="flex items-center gap-2 border-l border-rule pl-3">
+            <span className="hidden text-right text-[13px] leading-tight sm:block">
+              <span className="block font-medium text-ink">{user.name.replace(/ \((DEMO|SIMULATED)[^)]*\)/, '')}</span>
+              <span className="block text-[11px] text-ink-3">{user.role}{user.isDemo ? ' · demo account' : ''}</span>
+            </span>
+            <button className="btn-secondary" onClick={logout}>Switch</button>
+          </div>
         </div>
       </div>
     </header>
+  );
+}
+
+/** Integration truthfulness, always visible: a dot per provider, filled only when real. */
+function IntegrationStrip({ config }: { config: Config }) {
+  const items = [
+    { live: config.paypal.mode !== 'SIMULATED', label: 'PayPal', detail: config.paypal.mode === 'SIMULATED' ? 'simulated' : config.paypal.mode.replace('PAYPAL_', '').toLowerCase() },
+    { live: config.kernel.configured, label: 'Kernel', detail: config.kernel.configured ? 'live' : 'demo adapter' },
+    { live: config.ai.configured, label: 'AI', detail: config.ai.configured ? config.ai.label.split(':')[0] : 'heuristic' },
+  ];
+  return (
+    <Link to="/integrations" className="hidden items-center gap-3 rounded-[3px] px-2 py-1 hover:bg-paper lg:flex" title="Integration status — nothing is claimed as live unless it is">
+      {items.map((i) => (
+        <span key={i.label} className="flex items-center gap-1.5 text-[11px] text-ink-3">
+          <span className={`inline-block h-1.5 w-1.5 rounded-full ${i.live ? 'bg-released' : 'border border-hold bg-hold-wash'}`} />
+          {i.label} <span className="text-ink-3/70">{i.detail}</span>
+        </span>
+      ))}
+    </Link>
   );
 }
 
@@ -103,16 +130,13 @@ function VerifyBanner() {
   const [sent, setSent] = useState<string | null>(null);
   if (user.isDemo || user.emailVerifiedAt) return null;
   return (
-    <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-2">
+    <div className="border-b border-hold/30 bg-hold-wash px-4 py-2 text-[13px] text-hold">
+      <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-2">
         <b>Verify your email</b> to create or join projects. We sent a link to {user.email}.
         <button className="btn-secondary ml-auto" onClick={async () => { await api.post('/auth/resend-verification', { email: user.email }); setSent('Sent — check your inbox (or the dev mailbox on the sign-in page).'); }}>Resend link</button>
-        {sent && <span className="text-emerald-800">{sent}</span>}
+        {sent && <span className="text-released">{sent}</span>}
       </div>
     </div>
   );
 }
 
-function Pill({ ok, label }: { ok: boolean; label: string }) {
-  return <span className={`rounded-full px-2 py-0.5 font-medium ${ok ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'}`}>{label}</span>;
-}
