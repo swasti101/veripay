@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="style.css"><script src="store.js"></script><title>Northwind — Checkout</title></head>
+<body>
+<div class="demo">DEMO DELIVERABLE — sample storefront used in the VeriPay walkthrough. No real orders or payments.</div>
+<header><strong>Northwind Outfitters</strong><nav><a href="index.html">Home</a><a href="products.html">Shop products</a><a href="cart.html">Cart (<span id="cart-count">0</span>)</a><a href="admin.html">Admin dashboard</a></nav></header>
+<main>
+  <h1>Guest checkout</h1>
+  <form id="f" novalidate>
+    <p><input name="name" placeholder="Full name" required></p>
+    <p><input name="email" type="email" placeholder="Email" required></p>
+    <p><input name="address" placeholder="Address" required></p>
+    <p class="err" id="err"></p>
+    <button>Pay with PayPal sandbox (demo)</button>
+  </form>
+  <div id="ok" hidden><h2>Order confirmed</h2><p>Demo order — no payment was taken.</p></div>
+</main>
+<script>
+  const f = document.getElementById('f');
+  f.onsubmit = (e) => {
+    e.preventDefault();
+    const miss = [...f.elements].filter((x) => x.required && !x.value.trim()).map((x) => x.placeholder);
+    document.getElementById('err').textContent = miss.length ? 'Required: ' + miss.join(', ') : '';
+    if (!miss.length) { f.hidden = true; document.getElementById('ok').hidden = false; cart.set([]); }
+  };
+</script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="style.css"><script src="store.js"></script><title>Northwind — Product catalogue</title></head>
+<body>
+<div class="demo">DEMO DELIVERABLE — sample storefront used in the VeriPay walkthrough. No real orders or payments.</div>
+<header><strong>Northwind Outfitters</strong><nav><a href="index.html">Home</a><a href="products.html">Shop products</a><a href="cart.html">Cart (<span id="cart-count">0</span>)</a><a href="admin.html">Admin dashboard</a></nav></header>
+<main>
+  <h1>Product catalogue</h1>
+  <div class="filters">
+    <input type="search" id="q" placeholder="Search products" aria-label="Search products">
+    <select id="cat" aria-label="Category" data-filter="category"><option value="">All categories</option><option>tops</option><option>bottoms</option><option>outerwear</option><option>shoes</option><option>accessories</option></select>
+    <select id="price" aria-label="Price" data-filter="price"><option value="">Any price</option><option value="0-50">Under $50</option><option value="50-100">$50–$100</option><option value="100-9999">Over $100</option></select>
+  </div>
+  <div class="grid" id="list"></div>
+  <p class="empty" id="empty" hidden>No products match your search.</p>
+</main>
+<script>
+  const list = document.getElementById('list');
+  list.innerHTML = PRODUCTS.map(card).join('');
+  let timer;
+  function apply() {
+    const q = document.getElementById('q').value.toLowerCase().trim();
+    const c = document.getElementById('cat').value;
+    const [lo, hi] = (document.getElementById('price').value || '0-99999').split('-').map(Number);
+    let shown = 0;
+    for (const el of list.children) {
+      const p = PRODUCTS.find((x) => x.id == el.dataset.product);
+      const ok = (!q || p.name.toLowerCase().includes(q)) && (!c || p.category === c) && p.price >= lo && p.price <= hi;
+      el.style.display = ok ? '' : 'none';
+      shown += ok ? 1 : 0;
+    }
+    document.getElementById('empty').hidden = shown > 0;
+  }
+  document.getElementById('q').addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(apply, 250); });
+  for (const i of ['cat', 'price']) document.getElementById(i).addEventListener('change', apply);
+</script>
+</body>
+</html>

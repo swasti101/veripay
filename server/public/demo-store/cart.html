@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="style.css"><script src="store.js"></script><title>Northwind — Cart</title></head>
+<body>
+<div class="demo">DEMO DELIVERABLE — sample storefront used in the VeriPay walkthrough. No real orders or payments.</div>
+<header><strong>Northwind Outfitters</strong><nav><a href="index.html">Home</a><a href="products.html">Shop products</a><a href="cart.html">Cart (<span id="cart-count">0</span>)</a><a href="admin.html">Admin dashboard</a></nav></header>
+<main>
+  <h1>Your cart</h1>
+  <table><thead><tr><th>Item</th><th>Size</th><th>Qty</th><th>Total</th><th></th></tr></thead><tbody id="rows"></tbody></table>
+  <p><strong>Total: <span id="total"></span></strong></p>
+  <a href="checkout.html"><button>Proceed to checkout</button></a>
+</main>
+<script>
+  const rows = document.getElementById('rows');
+  function draw() {
+    const c = cart.get();
+    rows.innerHTML = c.map((i, n) => {
+      const p = PRODUCTS.find((x) => x.id === i.id);
+      return `<tr><td>${p.name}</td><td>${i.size}</td><td><input type="number" min="1" value="${i.qty}" data-n="${n}" style="width:70px"></td><td>$${p.price * i.qty}</td><td><button data-del="${n}">Remove</button></td></tr>`;
+    }).join('') || '<tr><td colspan="5" class="empty">Cart is empty</td></tr>';
+    document.getElementById('total').textContent = '$' + c.reduce((a, i) => a + PRODUCTS.find((x) => x.id === i.id).price * i.qty, 0);
+  }
+  rows.onchange = (e) => { const c = cart.get(); c[e.target.dataset.n].qty = Math.max(1, +e.target.value); cart.set(c); draw(); };
+  rows.onclick = (e) => { if (e.target.dataset.del) { const c = cart.get(); c.splice(+e.target.dataset.del, 1); cart.set(c); draw(); } };
+  draw();
+</script>
+</body>
+</html>

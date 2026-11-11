@@ -1,0 +1,43 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# All secrets use `sync: false` so values are entered in the Render dashboard, never committed.
+services:
+  - type: web
+    name: veripay
+    runtime: node
+    plan: starter            # a persistent disk requires a paid plan
+    buildCommand: npm run install:all && npm run build
+    startCommand: npm start
+    healthCheckPath: /healthz
+    disk:
+      name: veripay-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: HOST
+        value: 0.0.0.0       # required by Render; the server refuses this bind unless ALLOW_PUBLIC_DEMO=true
+      - key: ALLOW_PUBLIC_DEMO
+        sync: false          # set to "true" only if you accept that the demo sign-in has no passwords
+      - key: DATA_DIR
+        value: /var/data
+      - key: PUBLIC_BASE_URL
+        sync: false          # e.g. https://veripay.onrender.com — lets Kernel reach the demo storefront
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_MODE
+        value: sandbox
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      - key: KERNEL_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: APIMATIC_API_KEY
+        sync: false

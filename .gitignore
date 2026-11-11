@@ -1,0 +1,22 @@
+node_modules/
+dist/
+build/
+
+# Secrets — never commit. Only .env.example belongs in git.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Runtime data: JSON store + uploaded/captured evidence files
+server/data/
+data/
+
+# Generated SDKs (reproduce with `npm run sdk:generate`)
+apimatic/sdk/
+
+*.log
+.DS_Store
+.vscode/
+.idea/

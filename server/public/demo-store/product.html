@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="style.css"><script src="store.js"></script><title>Northwind — Product details</title></head>
+<body>
+<div class="demo">DEMO DELIVERABLE — sample storefront used in the VeriPay walkthrough. No real orders or payments.</div>
+<header><strong>Northwind Outfitters</strong><nav><a href="index.html">Home</a><a href="products.html">Shop products</a><a href="cart.html">Cart (<span id="cart-count">0</span>)</a><a href="admin.html">Admin dashboard</a></nav></header>
+<main>
+  <h1 id="pname">Product details</h1>
+  <div class="detail">
+    <img id="pimg" alt="Product image">
+    <div>
+      <p class="price" id="pprice"></p><p id="pdesc"></p><p id="pstock"></p>
+      <label>Size <select id="psize"><option>S</option><option>M</option><option>L</option><option>XL</option></select></label>
+      <button id="padd">Add to cart</button><p id="pmsg"></p>
+    </div>
+  </div>
+</main>
+<script>
+  const $ = (i) => document.getElementById(i);
+  const p = PRODUCTS.find((x) => x.id == new URLSearchParams(location.search).get('id')) || PRODUCTS[0];
+  $('pname').textContent = p.name; $('pimg').src = p.img; $('pimg').alt = p.name; $('pprice').textContent = '$' + p.price;
+  $('pdesc').textContent = 'A ' + p.category + ' staple in durable materials.';
+  $('pstock').textContent = p.stock ? 'In stock (' + p.stock + ')' : 'Out of stock';
+  $('padd').disabled = !p.stock;
+  $('padd').onclick = () => {
+    const c = cart.get();
+    const k = c.find((i) => i.id === p.id && i.size === $('psize').value);
+    if (k) k.qty++; else c.push({ id: p.id, size: $('psize').value, qty: 1 });
+    cart.set(c);
+    $('pmsg').textContent = 'Added to cart';
+  };
+</script>
+</body>
+</html>

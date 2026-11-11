@@ -1,0 +1,223 @@
+openapi: 3.0.3
+info:
+  title: VeriPay API
+  version: 1.0.0
+  description: |
+    SOW-based delivery verification, expert review and milestone payment allocation.
+    This spec is the input for APIMatic SDK generation (`npm run sdk:generate`).
+    Mutating requests require the `X-VeriPay: 1` header. Sessions use the `vp_session` cookie
+    (demo identity — replace with a real identity provider for production).
+servers:
+  - url: http://127.0.0.1:4000/api
+    description: Local
+security:
+  - session: []
+components:
+  securitySchemes:
+    session: { type: apiKey, in: cookie, name: vp_session }
+  parameters:
+    ProjectId: { name: projectId, in: path, required: true, schema: { type: string } }
+    MilestoneId: { name: milestoneId, in: path, required: true, schema: { type: string } }
+    XVeriPay: { name: X-VeriPay, in: header, required: true, schema: { type: string, enum: ['1'] } }
+  schemas:
+    Error: { type: object, properties: { error: { type: string } } }
+    Ok: { type: object, properties: { ok: { type: boolean } } }
+    VerificationStatus: { type: string, enum: [PASS, PARTIAL, FAIL, UNVERIFIED, NEEDS_CLARIFICATION, OUT_OF_SCOPE] }
+    FundingStatus: { type: string, enum: [FUNDING_REQUIRED, FUNDING_PENDING, AUTHORIZED, CAPTURED, AWAITING_DISBURSEMENT, PARTIALLY_PAID, PAID, PAYMENT_FAILED, REFUNDED, DISPUTED] }
+    Requirement:
+      type: object
+      properties:
+        id: { type: string, example: REQ-04 }
+        sowRef: { type: string, example: "§2.4" }
+        title: { type: string }
+        description: { type: string }
+        expectedOutcome: { type: string }
+        acceptanceCriteria: { type: array, items: { type: string } }
+        deliverable: { type: string }
+        milestoneId: { type: string }
+        evidenceRequired: { type: array, items: { type: string, enum: [visual, functional, document] } }
+        category: { type: string }
+        amount: { type: number, nullable: true }
+        ambiguity: { type: string, nullable: true }
+        clarification: { type: string, nullable: true }
+        status: { $ref: '#/components/schemas/VerificationStatus' }
+    Milestone:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        description: { type: string }
+        startDate: { type: string }
+        dueDate: { type: string }
+        amount: { type: number }
+        dependsOn: { type: array, items: { type: string } }
+    FundingPlan:
+      type: object
+      properties:
+        option: { type: string, enum: [ADVANCE, PARTIAL, FULL] }
+        committedMilestones: { type: array, items: { type: string } }
+    Agreement:
+      type: object
+      properties:
+        id: { type: string }
+        version: { type: integer }
+        status: { type: string, enum: [DRAFT, APPROVED, SUPERSEDED] }
+        budget: { type: number }
+        advanceAmount: { type: number }
+        requirements: { type: array, items: { $ref: '#/components/schemas/Requirement' } }
+        milestones: { type: array, items: { $ref: '#/components/schemas/Milestone' } }
+        fundingPlan: { $ref: '#/components/schemas/FundingPlan' }
+        partialPaymentRule: { type: string, enum: [PER_REQUIREMENT_AMOUNTS, MUTUAL_AGREEMENT_ONLY] }
+        approvals: { type: object, properties: { client: { type: string, nullable: true }, freelancer: { type: string, nullable: true } } }
+    QAResult:
+      type: object
+      properties:
+        requirementId: { type: string }
+        expected: { type: string }
+        actual: { type: string }
+        evidence: { type: array, items: { type: string } }
+        explanation: { type: string }
+        confidence: { type: string, enum: [HIGH, MEDIUM, LOW] }
+        nextAction: { type: string }
+        status: { $ref: '#/components/schemas/VerificationStatus' }
+    Allocation:
+      type: object
+      properties:
+        id: { type: string }
+        milestoneId: { type: string }
+        milestoneAmount: { type: number }
+        releaseType: { type: string, enum: [FULL_PAYMENT, PARTIAL_PAYMENT, UNDER_REVIEW, REVISION_REQUIRED] }
+        eligibleAmount: { type: number }
+        disputedAmount: { type: number }
+        rule: { type: string }
+        explanation: { type: array, items: { type: string } }
+        status: { type: string, enum: [PROPOSED, APPROVED, CHALLENGED, EXECUTED, SUPERSEDED] }
+    ExpertVoteInput:
+      type: object
+      required: [requirementId, vote, reasoning, evidence]
+      properties:
+        requirementId: { type: string }
+        vote: { type: string, enum: [COMPLIANT, PARTIALLY_COMPLIANT, NOT_COMPLIANT, INSUFFICIENT_EVIDENCE] }
+        reasoning: { type: string }
+        evidence: { type: string }
+        recommendation: { type: string }
+    FundOrder:
+      type: object
+      properties:
+        mode: { type: string, enum: [PAYPAL_SANDBOX, PAYPAL_LIVE, SIMULATED] }
+        orderId: { type: string }
+        approveUrl: { type: string, nullable: true }
+        amount: { type: number }
+        intent: { type: string, enum: [AUTHORIZE, CAPTURE] }
+paths:
+  /config:
+    get:
+      operationId: getConfig
+      security: []
+      summary: Integration status (PayPal / Kernel / AI / APIMatic)
+      responses: { '200': { description: OK, content: { application/json: { schema: { type: object } } } } }
+  /dashboard:
+    get:
+      operationId: getDashboard
+      responses: { '200': { description: OK, content: { application/json: { schema: { type: object } } } } }
+  /projects:
+    post:
+      operationId: createProject
+      parameters: [{ $ref: '#/components/parameters/XVeriPay' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [title], properties: { title: { type: string }, description: { type: string }, category: { type: string } } } } } }
+      responses: { '200': { description: Created, content: { application/json: { schema: { type: object } } } }, '400': { description: Bad request, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } } }
+  /projects/{projectId}:
+    get:
+      operationId: getProject
+      parameters: [{ $ref: '#/components/parameters/ProjectId' }]
+      responses: { '200': { description: Project workspace view, content: { application/json: { schema: { type: object } } } }, '403': { description: Not a party } }
+  /projects/{projectId}/sow:
+    post:
+      operationId: analyseSow
+      summary: Upload/paste a SOW and extract requirements, milestones and payment terms
+      parameters: [{ $ref: '#/components/parameters/ProjectId' }, { $ref: '#/components/parameters/XVeriPay' }]
+      requestBody: { required: true, content: { multipart/form-data: { schema: { type: object, properties: { sowText: { type: string }, file: { type: string, format: binary } } } } } }
+      responses: { '200': { description: Draft agreement, content: { application/json: { schema: { type: object, properties: { draft: { $ref: '#/components/schemas/Agreement' } } } } } } }
+  /projects/{projectId}/invite:
+    post:
+      operationId: inviteParty
+      parameters: [{ $ref: '#/components/parameters/ProjectId' }, { $ref: '#/components/parameters/XVeriPay' }]
+      requestBody: { content: { application/json: { schema: { type: object, properties: { email: { type: string } } } } } }
+      responses: { '200': { description: Invite code } }
+  /invites/{code}/accept:
+    post:
+      operationId: acceptInvite
+      parameters: [{ name: code, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/XVeriPay' }]
+      responses: { '200': { description: Joined } }
+  /projects/{projectId}/agreement/draft:
+    put:
+      operationId: editDraftAgreement
+      summary: Edit the draft version (clears both approvals)
+      parameters: [{ $ref: '#/components/parameters/ProjectId' }, { $ref: '#/components/parameters/XVeriPay' }]
+      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/Agreement' } } } }
+      responses: { '200': { description: Updated draft } }
+  /projects/{projectId}/agreement/funding-plan:
+    post:
+      operationId: chooseFundingPlan
+      parameters: [{ $ref: '#/components/parameters/ProjectId' }, { $ref: '#/components/parameters/XVeriPay' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/FundingPlan' } } } }
+      responses: { '200': { description: Plan saved } }
+  /projects/{projectId}/agreement/approve:
+    post:
+      operationId: approveAgreement
+      parameters: [{ $ref: '#/components/parameters/ProjectId' }, { $ref: '#/components/parameters/XVeriPay' }]
+      responses: { '200': { description: Approval recorded, content: { application/json: { schema: { type: object, properties: { locked: { type: boolean } } } } } } }
+  /projects/{projectId}/fund:
+    post:
+      operationId: createFundingOrder
+      summary: Create a PayPal order (advance = CAPTURE, milestone = AUTHORIZE, expert fee = CAPTURE)
+      parameters: [{ $ref: '#/components/parameters/ProjectId' }, { $ref: '#/components/parameters/XVeriPay' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [target], properties: { target: { type: string, example: M2 } } } } } }
+      responses: { '200': { description: Order, content: { application/json: { schema: { $ref: '#/components/schemas/FundOrder' } } } } }
+  /projects/{projectId}/fund/confirm:
+    post:
+      operationId: confirmFundingOrder
+      summary: Authorize/capture after buyer approval; server verifies with PayPal before updating status
+      parameters: [{ $ref: '#/components/parameters/ProjectId' }, { $ref: '#/components/parameters/XVeriPay' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [target, orderId], properties: { target: { type: string }, orderId: { type: string } } } } } }
+      responses: { '200': { description: Verified }, '502': { description: PayPal did not confirm } }
+  /projects/{projectId}/milestones/{milestoneId}/submissions:
+    post:
+      operationId: submitDeliverable
+      parameters: [{ $ref: '#/components/parameters/ProjectId' }, { $ref: '#/components/parameters/MilestoneId' }, { $ref: '#/components/parameters/XVeriPay' }]
+      requestBody: { content: { multipart/form-data: { schema: { type: object, properties: { url: { type: string }, notes: { type: string }, claims: { type: string, description: JSON array }, authorizeInspection: { type: string, enum: ['true', 'false'] }, files: { type: array, items: { type: string, format: binary } } } } } } }
+      responses: { '200': { description: Submission created; Kernel + QA start asynchronously } }
+  /projects/{projectId}/milestones/{milestoneId}/feedback:
+    post:
+      operationId: submitClientFeedback
+      parameters: [{ $ref: '#/components/parameters/ProjectId' }, { $ref: '#/components/parameters/MilestoneId' }, { $ref: '#/components/parameters/XVeriPay' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [rating], properties: { rating: { type: string, enum: [FULLY_SATISFIED, PARTIALLY_SATISFIED, NOT_SATISFIED] }, items: { type: array, items: { type: object, properties: { text: { type: string }, requirementId: { type: string } } } }, additional: { type: string } } } } } }
+      responses: { '200': { description: Classified feedback } }
+  /projects/{projectId}/milestones/{milestoneId}/expert-review:
+    post:
+      operationId: requestExpertReview
+      parameters: [{ $ref: '#/components/parameters/ProjectId' }, { $ref: '#/components/parameters/MilestoneId' }, { $ref: '#/components/parameters/XVeriPay' }]
+      requestBody: { content: { application/json: { schema: { type: object, properties: { requirementIds: { type: array, items: { type: string } }, reason: { type: string } } } } } }
+      responses: { '200': { description: Review created (awaiting fee acknowledgement) } }
+  /reviews/{reviewId}/votes:
+    post:
+      operationId: castExpertVote
+      parameters: [{ name: reviewId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/XVeriPay' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { votes: { type: array, items: { $ref: '#/components/schemas/ExpertVoteInput' } } } } } } }
+      responses: { '200': { description: Sealed vote recorded } }
+  /projects/{projectId}/milestones/{milestoneId}/allocation:
+    post:
+      operationId: recommendAllocation
+      parameters: [{ $ref: '#/components/parameters/ProjectId' }, { $ref: '#/components/parameters/MilestoneId' }, { $ref: '#/components/parameters/XVeriPay' }]
+      responses: { '200': { description: Recommendation, content: { application/json: { schema: { type: object, properties: { allocation: { $ref: '#/components/schemas/Allocation' } } } } } } }
+  /allocations/{allocationId}/approve:
+    post:
+      operationId: approveAllocation
+      parameters: [{ name: allocationId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/XVeriPay' }]
+      responses: { '200': { description: Approval / acknowledgement recorded } }
+  /allocations/{allocationId}/execute:
+    post:
+      operationId: executeAllocation
+      summary: PayPal capture of the approved amount + payout to the freelancer (requires both approvals)
+      parameters: [{ name: allocationId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/XVeriPay' }]
+      responses: { '200': { description: Executed }, '409': { description: Missing approvals or funding } }
