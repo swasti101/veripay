@@ -211,11 +211,15 @@ export interface Submission {
 }
 
 export interface KernelRun {
-  mode: 'KERNEL_LIVE' | 'DEMO_ADAPTER_HTTP_FETCH' | 'SKIPPED';
+  // KERNEL_LIVE: Kernel cloud browser. LOCAL_BROWSER: the same script on a Chromium on this
+  // server — real clicks and screenshots, but explicitly not Kernel. DEMO_ADAPTER: static HTTP only.
+  mode: 'KERNEL_LIVE' | 'LOCAL_BROWSER' | 'DEMO_ADAPTER_HTTP_FETCH' | 'SKIPPED';
   note: string;
   sessionId?: string;
   liveViewUrl?: string;
   actions: { at: string; action: string; detail: string; ok: boolean }[];
+  /** The agent's journey, in order: what it did, what it saw, and a capture of the moment. */
+  steps?: { n: number; kind: 'open' | 'resize' | 'navigate' | 'type' | 'select' | 'click' | 'inspect'; what: string; found: string; ok: boolean; url: string; shot?: string }[];
   pages: { url: string; title: string; viewport: string; headings: string[]; signals: Record<string, boolean | number | string> }[];
   consoleErrors: string[];
   screenshots: Evidence[];

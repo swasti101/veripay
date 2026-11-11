@@ -143,8 +143,12 @@ export async function completeOrder(orderId: string, intent: 'AUTHORIZE' | 'CAPT
   };
 }
 
+/** A money object stays in the mode it was created in: a simulated hold (SIM-…) is never
+ *  sent to real PayPal, even after real credentials are added. */
+export const isSimulatedId = (v?: string | null) => !!v && v.startsWith('SIM-');
+
 export async function captureAuthorization(authorizationId: string, amount: number, finalCapture: boolean, invoiceId: string) {
-  if (!paypalConfigured()) return { mode: 'SIMULATED' as const, captureId: sim('CAPTURE'), status: 'COMPLETED' };
+  if (!paypalConfigured() || isSimulatedId(authorizationId)) return { mode: 'SIMULATED' as const, captureId: sim('CAPTURE'), status: 'COMPLETED' };
   const { payments } = sdk();
   try {
     const r = await payments.captureAuthorizedPayment({ authorizationId, prefer: 'return=representation', paypalRequestId: invoiceId, body: { amount: money(amount), finalCapture, invoiceId } });
@@ -153,13 +157,13 @@ export async function captureAuthorization(authorizationId: string, amount: numb
 }
 
 export async function voidAuthorization(authorizationId: string) {
-  if (!paypalConfigured()) return { mode: 'SIMULATED' as const, status: 'VOIDED' };
+  if (!paypalConfigured() || isSimulatedId(authorizationId)) return { mode: 'SIMULATED' as const, status: 'VOIDED' };
   const { payments } = sdk();
   try { await payments.voidPayment({ authorizationId }); return { mode: paypalMode(), status: 'VOIDED' }; } catch (e) { throw toPayPalError(e); }
 }
 
 export async function refundCapture(captureId: string, amount: number) {
-  if (!paypalConfigured()) return { mode: 'SIMULATED' as const, refundId: sim('REFUND'), status: 'COMPLETED' };
+  if (!paypalConfigured() || isSimulatedId(captureId)) return { mode: 'SIMULATED' as const, refundId: sim('REFUND'), status: 'COMPLETED' };
   const { payments } = sdk();
   try {
     const r = await payments.refundCapturedPayment({ captureId, body: { amount: money(amount) } });
@@ -178,8 +182,9 @@ async function token() {
 }
 
 /** Payouts API (POST /v1/payments/payouts). Requires Payouts to be enabled on the PayPal account. */
-export async function sendPayout(opts: { receiverEmail: string; amount: number; note: string; senderItemId: string; batchId: string }) {
-  if (!paypalConfigured()) return { mode: 'SIMULATED' as const, payoutBatchId: sim('PAYOUT'), batchStatus: 'SUCCESS', itemStatus: 'SUCCESS' };
+export async function sendPayout(opts: { receiverEmail: string; amount: number; note: string; senderItemId: string; batchId: string; simulate?: boolean }) {
+  // Paying out money that only ever existed in simulation would move real sandbox funds.
+  if (!paypalConfigured() || opts.simulate) return { mode: 'SIMULATED' as const, payoutBatchId: sim('PAYOUT'), batchStatus: 'SUCCESS', itemStatus: 'SUCCESS' };
   const r = await fetch(`${base()}/v1/payments/payouts`, {
     method: 'POST',
     headers: { authorization: `Bearer ${await token()}`, 'content-type': 'application/json', 'paypal-request-id': opts.batchId },

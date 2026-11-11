@@ -1,57 +1,91 @@
 # Demo script & sponsor-key checklist
 
-## 1. Live showcase (7–10 minutes)
+## 1. Live showcase (8–10 minutes)
 
-The main demo project is **Northwind Outfitters — E-Commerce Storefront**: a $8,500 three-milestone website build. Advance + Milestone 1 are pre-funded and paid, so you walk the judges from a live, half-complete project through to the moneyed outcome.
+Seeded project: **Northwind Outfitters — E-Commerce Storefront**, $8,500 over three milestones.
+The advance and Milestone 1 are already paid, M2 (Search & Checkout) is funded and in progress —
+so you start at the moment the freelancer submits, which is where the product earns its keep.
 
-### 0 · Open at the landing page (~30 s)
-- Tab shows **PayPal / Kernel / AI** status pills at top-right. Open *Integrations* once to show the honest matrix. When no keys are set, everything labels itself SIMULATED / DEMO ADAPTER / HEURISTIC — no fake live calls.
-- Click **Demo accounts** → **Alex Rivera (client)**. (For SaaS onboarding, click **Create account** instead and show the email-verification dev mailbox.)
+Use the **View as · Client / Freelancer / Expert** switch at the bottom of the left rail to change
+sides without signing out. You stay on the same page, so the audience sees both sides of one moment.
 
-### 1 · "This is a real SaaS" (~1 min)
-- Dashboard → open *Integrations*: show "Platform fee: 5% of each release" baked into every agreement (configurable per project; capped at 20%).
-- Mention: real signup with scrypt passwords, email verification, rate-limiting, cross-tenant isolation (shown automatically on *Audit trail*). Demo accounts are gated behind a button and can be disabled with `DISABLE_DEMO_LOGIN=true`.
+### 0 · Landing (~30 s)
+Open `http://127.0.0.1:4000/`. Point at the hero specimen: one real payment decision with its reasoning
+— computer agent PASS, vision PASS, text NEEDS_CLARIFICATION, panel 2–1, **$3,000 released**. Scroll to
+the three analysers and the domain tiles: each domain names which analysers check that kind of work.
+Click **Open the demo** → **Demo** tab → **Sam Okafor** (freelancer).
 
-### 2 · SOW baseline (~1 min)
-- Open **Northwind Outfitters** → *SOW & Agreement*. Point out:
-  - 6 requirements extracted with IDs, acceptance criteria, evidence type, and per-requirement amounts — "AI extracts what the SOW says; vague words like *fast* and *relevant* are flagged, nothing invented."
-  - **Agreement v1 locked** by both parties. Any edit clears both approvals; new scope needs a new version.
+### 1 · The freelancer submits (~1 min)
+Projects → Northwind → **Submit & verify** in the rail. The URL of the demo storefront is pre-filled.
+Leave *Let the computer agent use this site* ticked and press **Submit for verification**.
+The stage track at the top moves Funded → Submitted.
 
-### 3 · Funding (~45 s)
-- *Funding* → three clearly separated options (advance, partial, full). Northwind uses PARTIAL. The authorization tile notes PayPal's 29-day cap. "This is not escrow — funds sit on the payer's PayPal account via authorization."
+### 2 · Three analysers at work (~3 min — the core of the demo)
+The report opens in three layers:
+- **Verdict** — one line, with counts per status and which engine produced each part.
+- **Requirement by requirement** — open REQ-04 and REQ-05. Each shows what the agreement asks for, then
+  what the computer agent, vision analyser and text analyser each found. REQ-04 carries a purple
+  *Fairness rule applied* note: the SOW says "fast" and "relevant" with no threshold, so it cannot be passed.
+- **Computer agent** tab — the journey replay. Read it out: it opened the site, resized to a phone,
+  followed the catalogue link, **typed "linen" and 12 products became 2**, typed a nonsense term and
+  checked the empty state, **chose a filter and 12 became 3**, opened a product and **clicked "Add to cart" —
+  the cart went from (0) to (1)**. Click any thumbnail to enlarge the screenshot taken at that step.
+- **Vision analyser** tab — the captured screenshots. With an AI key it reads them against the criteria.
+- **Text analyser** tab — notes, documents and test reports read against the SOW.
 
-### 4 · Delivery & Kernel + QA (~1.5 min)
-- *Switch user* → **Sam Okafor (freelancer)**. Go to *Delivery & QA*.
-- Submit the pre-filled URL (`/demo-store/index.html`) with **Attach sample test report** checked, inspection authorized. Click **Submit**.
-- QA runs for ~3 s and renders: 1 PASS (REQ-05 Cart & checkout), 1 **NEEDS_CLARIFICATION** (REQ-04, because the SOW says "fast" and "relevant" with no threshold). Walk through the Kernel pages table, screenshots (if `KERNEL_API_KEY` is set), guardrail notes and the QA Mediator summary.
+Say the honest bit out loud: the badge says *Local browser* — a real Chromium running the exact
+script Kernel would run. With `KERNEL_API_KEY` set it runs in Kernel's cloud browser instead.
 
-### 5 · Client satisfaction (~45 s)
-- Switch to **Alex** → *Client feedback* → **Partially satisfied** → **Fill sample client concerns** → Submit.
-- The Client Expectation Agent classifies: one **OUT_OF_SCOPE_REQUEST** (typo-tolerant search) and one **SUBJECTIVE_PREFERENCE** (darker cart colour). "These signal but do not reduce the freelancer's earned pay."
-- A scope-change request is auto-filed for the out-of-scope item (*Scope & disputes*).
+### 3 · The agent talks to the freelancer (~30 s)
+Rail → **Messages**. The **Freelancer Delivery Agent** has posted, privately to the freelancer, what each
+non-passing requirement needs next. Agents have square monograms; people have round ones; private
+messages say who they are for.
 
-### 6 · Expert panel — the differentiator (~2 min)
-- *Expert review* → **Request expert review for M2**. REQ-04 is picked up automatically because AI returned NEEDS_CLARIFICATION.
-- Panel: Mira Kovac, Daniel Osei, Priya Natarajan. Jordan Blake is listed as **excluded** (declared relationship with the freelancer).
-- Fee disclosure: $25 × 3 = $75, paid by the client, independent of the vote, never deducted from the freelancer. Click **Acknowledge fee** → **Pay expert fee** → approve.
-- Switch to **Sam**, acknowledge fee → **Generate votes for SIMULATED experts** (clearly labelled). Three sealed votes reveal: 2 COMPLIANT, 1 PARTIALLY_COMPLIANT (minority preserved with full reasoning).
-- For real experts: sign in as **Mira Kovac** to show the expert portal — conflict declaration required, packet identical for every reviewer, votes sealed until close.
+### 4 · In scope or out of scope? (~1 min)
+**View as · Client.** In Messages, choose *Ask the AI project manager* and click the suggestion
+**"Can you also add typo-tolerant search?"** → Send.
+The **Client Expectation Agent** answers that it is outside the agreement, **quoting the SOW's exclusion**,
+and states it will not count against delivered work. It then opens a change request automatically.
+Rail → **Scope changes**: the request sits *Awaiting freelancer*. View as freelancer → quote a price and
+days → view as client → approve → it becomes agreement v2 with its own milestone.
+Contrast: ask *"When is the next milestone due?"* — that is answered from the agreement, no change request.
 
-### 7 · Payment Allocation Engine + release (~1 min)
-- Still as Sam → *Payments* → **Recalculate recommendation** → **FULL_PAYMENT $3,000**. The "how this was calculated" box cites each input: agreement v1 amounts, expert panel result, client feedback classifications, fairness rule for preferences.
-- **Acknowledge recommendation**. Switch to **Alex** → **Approve release** → **Release $3,000 via PayPal**.
-- Transaction ledger shows: capture $3,000 → freelancer payout $2,850 (net) + platform fee $150 retained. That's the SaaS revenue, visible and honest.
+### 5 · Client review → expert panel → decision (~2 min)
+As client: **Client review** → *Partially satisfied* → *Fill sample client concerns* → Submit.
+Feedback is classified: typo-tolerance → out of scope, darker cart → subjective preference. Neither reduces pay.
+**Expert panel** → request review (REQ-04 is picked up because it needed clarification) → acknowledge the fee
+→ pay it. View as freelancer → acknowledge → *Generate votes for simulated experts*. Votes appear 2–1 compliant
+with the dissent kept.
+**Payment decision** → recalculate → **full payment $3,000**, with the calculation shown line by line →
+acknowledge as freelancer → approve and release as client. Ledger: capture $3,000, payout $2,850,
+platform fee $150.
 
-### 8 · Contrast scenarios (~30 s)
-- Open **Lumen Analytics**: 2 PASS / 1 FAIL (PDF export), experts 2–1 NOT_COMPLIANT, engine recommends **$2,500 partial / $1,500 held pending revision**.
-- Open **Harbor Dental**: clear compliance → full payment.
+### 6 · Contrast and transparency (~1 min)
+Lumen Analytics (failed PDF export → $2,500 paid, $1,500 held), Harbor Dental (clean full payment),
+**Delivery board** (an unpaid tranche visibly blocks M3), **Audit trail**.
 
-### 9 · Transparency (~30 s)
-- *Audit trail* → every decision traceable to its evidence, including Kernel actions, AI sources, expert votes, PayPal IDs and both parties' approvals.
-- *Timeline* (Bryntum) → milestones, requirements and payment checkpoints on one Gantt.
+### One-line pitch
+> The work is checked by an agent that actually uses it, the money follows what was agreed, and anything
+> genuinely ambiguous goes to people — not to a confidence score.
 
-### Showcase pitch (1 sentence)
-> VeriPay turns "the AI said you should get $X" into *"your agreement said $A, the evidence shows deliverable B was met, the expert panel confirmed by a 2–1 vote, so $Y is released now and $Z stays held — and both of you approved before the money moved."*
+---
+
+## 1b. How to test the AI and payment parts before you present
+
+| What | How | Expected |
+|---|---|---|
+| Computer agent (no keys) | Submit the demo storefront URL as Sam | 12 steps, ~10 screenshots, "Cart (0) → Cart (1)", mode *Local browser* |
+| Computer agent (Kernel) | Add `KERNEL_API_KEY`, deploy, submit the **public** URL | Same journey, mode *Kernel cloud browser*, a session id |
+| Vision + text with a model | Add `GROQ_API_KEY` (or Anthropic/Gemini), restart, resubmit | Vision tab shows per-requirement observations; header names the model |
+| Out-of-scope detection | Ask the PM "Can you also add typo-tolerant search?" as client | Exclusion quoted, change request opened |
+| In-scope question | Ask "Does the agreement cover an admin login?" | Answered from REQ-06, no change request |
+| Payments, simulated | Start with `PAYPAL_CLIENT_ID= PAYPAL_CLIENT_SECRET= npm start` | Everything completes; every row labelled *Simulated* |
+| Payments, real sandbox | Default `.env`; fund M3 as client → PayPal button → log in as a sandbox **personal** account | Real order and authorization ids; status changes only after the server re-reads the order |
+| Seeded money in sandbox mode | Release M2 with real creds set | Capture, payout and fee all stay *Simulated* — a simulated hold is never sent to PayPal |
+| Payout to a real sandbox account | Payments tab → set the freelancer's payout email to a second sandbox account | Payout batch id from PayPal, status *Pending* → *Success* on refresh |
+| Error path | Confirm an order without approving it | `PayPal 422 ORDER_NOT_APPROVED … [debug_id …]`, funding state unchanged |
+
+Reset between rehearsals: **Integrations → Reset demo data**, or `npm run seed` with the server stopped.
 
 ---
 

@@ -37,7 +37,7 @@ export default function NotificationBell() {
   return (
     <div className="relative" ref={box}>
       <button
-        className="relative rounded-lg p-1.5 text-slate-600 transition hover:bg-slate-100"
+        className="relative rounded-[3px] p-1.5 text-ink-2 transition hover:bg-paper"
         aria-label={n ? `${n} action${n === 1 ? '' : 's'} waiting on you` : 'No actions waiting'}
         title={n ? `${n} action${n === 1 ? '' : 's'} waiting on you — click to open` : 'Nothing is waiting on you'}
         onClick={() => { if (n === 1 && items) go(items[0]); else setOpen(!open); }}
@@ -50,20 +50,20 @@ export default function NotificationBell() {
         )}
       </button>
       {open && (
-        <div className="absolute right-0 z-40 mt-2 w-80 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+        <div className="absolute right-0 z-40 mt-2 w-80 rounded-[4px] border border-rule bg-white p-2 shadow-lg">
           <div className="flex items-center justify-between px-2 py-1">
-            <span className="text-sm font-semibold text-slate-800">Waiting on you</span>
+            <span className="text-sm font-semibold text-ink">Waiting on you</span>
             {n > 0 && <Badge tone="red">{String(n)}</Badge>}
           </div>
           {items === null ? <div className="p-3"><Spinner /></div>
-            : n === 0 ? <p className="px-2 py-3 text-sm text-slate-500">Nothing is waiting on you right now.</p>
+            : n === 0 ? <p className="px-2 py-3 text-sm text-ink-3">Nothing is waiting on you right now.</p>
               : (
                 <ul className="max-h-80 overflow-y-auto">
                   {items.map((it, i) => (
                     <li key={i}>
-                      <button className="w-full rounded-lg px-2 py-2 text-left hover:bg-slate-50" onClick={() => go(it)}>
-                        <div className="text-sm font-medium text-slate-800">{it.action}</div>
-                        <div className="truncate text-xs text-slate-500">{it.project}</div>
+                      <button className="w-full rounded-[3px] px-2 py-2 text-left hover:bg-paper" onClick={() => go(it)}>
+                        <div className="text-sm font-medium text-ink">{it.action}</div>
+                        <div className="truncate text-xs text-ink-3">{it.project}</div>
                       </button>
                     </li>
                   ))}

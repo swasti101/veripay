@@ -27,10 +27,10 @@ export default function Feedback({ v, reload, mid }: WsProps) {
     <div className="space-y-4">
       {party === 'client' && sub && (
         <Section title={`How satisfied are you with ${mid}, revision ${sub.revision}?`}>
-          <div className="mb-3 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">Your satisfaction is an important signal, but it does not override the agreed SOW. Please link each concern to a requirement where possible — the Client Expectation Agent distinguishes unmet requirements from new requests or preferences.</div>
+          <div className="mb-3 rounded-[3px] bg-paper p-3 text-xs text-ink-2">Your satisfaction is an important signal, but it does not override the agreed SOW. Please link each concern to a requirement where possible — the Client Expectation Agent distinguishes unmet requirements from new requests or preferences.</div>
           <div className="mb-3 grid gap-2 sm:grid-cols-3">
-            {[['FULLY_SATISFIED', 'Fully satisfied', 'border-emerald-400 bg-emerald-50'], ['PARTIALLY_SATISFIED', 'Partially satisfied', 'border-amber-400 bg-amber-50'], ['NOT_SATISFIED', 'Not satisfied', 'border-rose-400 bg-rose-50']].map(([k, l, c]) => (
-              <button key={k} onClick={() => setRating(k)} className={`rounded-xl border-2 p-3 font-medium ${rating === k ? c : 'border-slate-200 bg-white'}`}>{l}</button>
+            {[['FULLY_SATISFIED', 'Fully satisfied', 'border-released/40 bg-released-wash'], ['PARTIALLY_SATISFIED', 'Partially satisfied', 'border-hold/40 bg-hold-wash'], ['NOT_SATISFIED', 'Not satisfied', 'border-refuse/40 bg-refuse-wash']].map(([k, l, c]) => (
+              <button key={k} onClick={() => setRating(k)} className={`rounded-[4px] border-2 p-3 font-medium ${rating === k ? c : 'border-rule bg-white'}`}>{l}</button>
             ))}
           </div>
           {rating && rating !== 'FULLY_SATISFIED' && (
@@ -58,12 +58,12 @@ export default function Feedback({ v, reload, mid }: WsProps) {
       {party === 'client' && !sub && <Empty title="Nothing submitted for this milestone yet" />}
       <Section title="Feedback & classification">
         {list.length === 0 ? <p className="muted">No feedback yet.</p> : [...list].reverse().map((f: any) => (
-          <div key={f.id} className="mb-3 rounded-lg border border-slate-200 p-3">
-            <div className="mb-2 flex flex-wrap items-center gap-2"><Badge>{f.rating}</Badge><span className="text-xs text-slate-500">{dt(f.createdAt)} · classified by {f.aiSource}</span></div>
-            {f.classification.length === 0 ? <p className="text-sm text-slate-600">No issues raised.</p> : (
+          <div key={f.id} className="mb-3 rounded-[3px] border border-rule p-3">
+            <div className="mb-2 flex flex-wrap items-center gap-2"><Badge>{f.rating}</Badge><span className="text-xs text-ink-3">{dt(f.createdAt)} · classified by {f.aiSource}</span></div>
+            {f.classification.length === 0 ? <p className="text-sm text-ink-2">No issues raised.</p> : (
               <ul className="space-y-2">{f.classification.map((c: any, i: number) => (
                 <li key={i} className="text-sm"><div className="flex flex-wrap items-center gap-2"><Badge>{c.category}</Badge>{c.requirementId && <b>{c.requirementId}</b>}<span>"{c.text}"</span></div>
-                  <div className="ml-1 text-xs text-slate-500">{c.rationale} {CAT_HELP[c.category]}</div></li>
+                  <div className="ml-1 text-xs text-ink-3">{c.rationale} {CAT_HELP[c.category]}</div></li>
               ))}</ul>
             )}
           </div>

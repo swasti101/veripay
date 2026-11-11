@@ -6,7 +6,7 @@ export default function Audit({ v }: WsProps) {
   const rows = [...v.audit].reverse().map((x: any) => ({ ...x, actorName: v.users[x.actor]?.name || x.actor }));
   return (
     <Section title="Activity & decision audit trail">
-      <p className="mb-2 text-xs text-slate-500">Append-only record of SOW versions, approvals, clarifications, submissions, Kernel runs, QA decisions, feedback, expert selection and votes, fees, funding, allocation recommendations, approvals and PayPal confirmations. Each entry references its supporting evidence.</p>
+      <p className="mb-2 text-xs text-ink-3">Append-only record of SOW versions, approvals, clarifications, submissions, Kernel runs, QA decisions, feedback, expert selection and votes, fees, funding, allocation recommendations, approvals and PayPal confirmations. Each entry references its supporting evidence.</p>
       <Grid rows={rows} height={600} pagination cols={[
         { field: 'at', headerName: 'When', cellRenderer: dateCell, minWidth: 170, maxWidth: 190 },
         { field: 'actorType', headerName: 'Type', maxWidth: 110 },

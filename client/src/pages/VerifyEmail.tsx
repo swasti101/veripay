@@ -30,7 +30,7 @@ export default function VerifyEmail() {
       <div className="card p-6">
         <h1 className="text-xl font-bold">Verifying your email…</h1>
         {state === 'pending' && <div className="mt-3"><Spinner /></div>}
-        {state === 'ok' && <p className="mt-3 text-emerald-700">Verified. Redirecting…</p>}
+        {state === 'ok' && <p className="mt-3 text-released">Verified. Redirecting…</p>}
         {state === 'error' && <ErrorNote error={err} />}
       </div>
     </div>

@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import Logo from '../components/Logo';
 import { api } from '../api';
 import { useApp } from '../App';
 import { Badge, ErrorNote, SimTag, useAction } from '../components/ui';
@@ -23,7 +24,11 @@ export default function Login() {
     api.get('/auth/demo-users').then(setDemo).catch(() => {});
     api.get('/auth/dev-mailbox').then((m) => setDevInbox(m.messages || [])).catch(() => {});
   }, [notice]);
-  const after = async () => { await refreshUser(); nav(loc.pathname.startsWith('/join/') ? loc.pathname : '/'); };
+  const after = async () => {
+    await refreshUser();
+    const from = (loc.state as any)?.from;
+    nav(loc.pathname.startsWith('/join/') ? loc.pathname : from && from !== '/signin' ? from : '/');
+  };
 
   const tabBtn = (k: Tab, label: string) => (
     <button type="button" onClick={() => { setTab(k); a.setError(null); }}
@@ -35,9 +40,9 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-paper">
       <header className="border-b border-rule bg-surface">
-        <div className="mx-auto flex max-w-[1180px] items-center gap-2 px-6 py-3">
-          <span className="grid h-6 w-6 place-items-center rounded-[2px] bg-seal text-[13px] font-semibold text-white" style={{ fontFamily: 'var(--font-display)' }}>V</span>
-          <span className="text-[16px] font-semibold tracking-tight text-ink" style={{ fontFamily: 'var(--font-display)' }}>VeriPay</span>
+        <div className="mx-auto flex max-w-[1180px] items-center gap-2 px-6 py-3.5">
+          <Link to="/"><Logo /></Link>
+          <Link to="/" className="btn-ghost ml-auto">Back to the overview</Link>
         </div>
       </header>
 

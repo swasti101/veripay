@@ -64,9 +64,9 @@ export default function Timeline({ v }: WsProps) {
 
   if (!ag) return <Section title="Timeline"><p className="muted">No milestones yet.</p></Section>;
   return (
-    <Section title="Milestones & payment timeline" actions={<span className="flex items-center gap-2 text-xs text-slate-500">Powered by <b>Bryntum Gantt</b> (trial package) <Badge tone="blue">{v.activeAgreement ? `agreement v${v.activeAgreement.version}` : 'DRAFT'}</Badge></span>}>
-      <p className="mb-2 text-xs text-slate-500">Milestones, their requirements, dependencies, funding/work/QA status and the payment checkpoint at each due date. The structure comes from the agreement both parties approved — edit it via a new agreement version.</p>
-      <div ref={host} style={{ height: 520 }} className="overflow-hidden rounded-lg border border-slate-200" />
+    <Section title="Milestones & payment timeline" actions={<span className="flex items-center gap-2 text-xs text-ink-3">Powered by <b>Bryntum Gantt</b> (trial package) <Badge tone="blue">{v.activeAgreement ? `agreement v${v.activeAgreement.version}` : 'DRAFT'}</Badge></span>}>
+      <p className="mb-2 text-xs text-ink-3">Milestones, their requirements, dependencies, funding/work/QA status and the payment checkpoint at each due date. The structure comes from the agreement both parties approved — edit it via a new agreement version.</p>
+      <div ref={host} style={{ height: 520 }} className="overflow-hidden rounded-[3px] border border-rule" />
     </Section>
   );
 }

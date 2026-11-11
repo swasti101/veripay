@@ -96,9 +96,28 @@ export async function askPM(project: Project, question: string, askerRole: strin
   // Heuristic: answer status questions from state; detect out-of-scope by keyword vs requirements.
   const q = question.toLowerCase();
   const words = q.split(/\W+/).filter((w) => w.length > 4);
+  const asksNew = /(add|also|new|extra|could you|can you (build|make)|integrate|in scope|included|covered)/.test(q);
+  // Explicit exclusions win over keyword overlap: "typo-tolerant search" overlaps the word
+  // "search" in a requirement, but the SOW says in writing that it is excluded.
+  const exclusions = ag?.extraction?.exclusions || [];
+  const excluded = exclusions.find((e) => {
+    const ew = e.toLowerCase().split(/\W+/).filter((w) => w.length >= 6);
+    return ew.some((w) => q.includes(w));
+  });
+  if (excluded) {
+    return { source: 'heuristic', outOfScope: true, text: `That is outside the agreement. The SOW lists it as an exclusion: "${excluded}". It will not count against the work already delivered. If you want it, it becomes a change request — the freelancer prices it, you approve or decline, and only then is it added as a new agreement version.` };
+  }
+  // Schedule questions get dates, not a status dump.
+  if (/(due|deadline|when is|when's|how long|next milestone)/.test(q) && ag) {
+    const open = ag.milestones.filter((m) => !['ACCEPTED', 'CLOSED'].includes(project.milestoneStates.find((s) => s.milestoneId === m.id)?.workStatus || ''));
+    if (!open.length) return { source: 'heuristic', outOfScope: false, text: 'Every milestone in the agreement has been accepted.' };
+    const next = open[0];
+    const days = Math.round((Date.parse(next.dueDate) - Date.now()) / 864e5);
+    const rest = open.slice(1).map((m) => `${m.id} ${m.title} is due ${m.dueDate}`).join('; ');
+    return { source: 'heuristic', outOfScope: false, text: `${next.id} ${next.title} is due ${next.dueDate}${isNaN(days) ? '' : days >= 0 ? ` — ${days} day${days === 1 ? '' : 's'} from now` : ` — ${-days} day${days === -1 ? '' : 's'} overdue`}.${rest ? ` After that: ${rest}.` : ''}` };
+  }
   const covered = ag?.requirements.filter((r) => words.some((w) => (r.title + ' ' + r.description).toLowerCase().includes(w))) || [];
-  const asksNew = /(add|also|new|extra|could you|can you build|integrate)/.test(q);
-  if (asksNew && !covered.length) return { source: 'heuristic', outOfScope: true, text: 'That does not match any approved requirement, so it is outside the current agreement. You can raise a scope-change request (Scope & Disputes tab); the freelancer may price it and both parties approve it as a new agreement version.' };
+  if (asksNew && !covered.length) return { source: 'heuristic', outOfScope: true, text: 'Nothing in the agreed requirements covers that, so it is outside the current agreement. It can become a change request: the freelancer prices it, the client approves or declines, and only then is it added as a new agreement version.' };
   if (covered.length) return { source: 'heuristic', outOfScope: false, text: covered.map((r) => `${r.id} "${r.title}" (${r.milestoneId}) — status ${r.status}. Acceptance: ${r.acceptanceCriteria.join('; ')}${r.clarification ? `. Approved clarification: ${r.clarification}` : ''}`).join('\n') };
   const st = project.milestoneStates.map((s) => `${s.milestoneId}: work ${s.workStatus}, funding ${s.fundingStatus}, paid $${s.paid}`).join('; ');
   return { source: 'heuristic', outOfScope: false, text: `Project status: ${project.status}. ${st || 'No milestones are active yet.'} (No AI provider configured — answers are rule-based.)` };

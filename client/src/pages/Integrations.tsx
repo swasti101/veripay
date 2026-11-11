@@ -19,15 +19,15 @@ export default function Integrations() {
     <main className="mx-auto max-w-5xl space-y-4 px-4 py-6">
       <Section title="Integration status">
         <table className="w-full text-sm">
-          <thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-1">Integration</th><th>Status</th><th>What it does</th><th>Configuration</th></tr></thead>
-          <tbody className="divide-y divide-slate-100 align-top">{rows.map(([n, s, w, c]) => (
-            <tr key={n}><td className="py-2 font-semibold">{n}</td><td>{/SIMULATED|DEMO|HEURISTIC/.test(s) ? <SimTag label={s} /> : <Badge tone="green">{s}</Badge>}</td><td className="pr-3 text-slate-600">{w}</td><td className="text-xs text-slate-500">{c}</td></tr>
+          <thead className="text-left text-xs uppercase text-ink-3"><tr><th className="py-1">Integration</th><th>Status</th><th>What it does</th><th>Configuration</th></tr></thead>
+          <tbody className="divide-y divide-rule align-top">{rows.map(([n, s, w, c]) => (
+            <tr key={n}><td className="py-2 font-semibold">{n}</td><td>{/SIMULATED|DEMO|HEURISTIC/.test(s) ? <SimTag label={s} /> : <Badge tone="green">{s}</Badge>}</td><td className="pr-3 text-ink-2">{w}</td><td className="text-xs text-ink-3">{c}</td></tr>
           ))}</tbody>
         </table>
-        <p className="mt-3 text-xs text-slate-500">OpenAPI spec: <a className="underline" href={config.apimatic.openapi} target="_blank" rel="noreferrer">{config.apimatic.openapi}</a></p>
+        <p className="mt-3 text-xs text-ink-3">OpenAPI spec: <a className="underline" href={config.apimatic.openapi} target="_blank" rel="noreferrer">{config.apimatic.openapi}</a></p>
       </Section>
       <Section title="Demo data">
-        <p className="mb-2 text-sm text-slate-600">Reset all projects, people and transactions to the seeded DEMO scenarios. You will be signed out.</p>
+        <p className="mb-2 text-sm text-ink-2">Reset all projects, people and transactions to the seeded DEMO scenarios. You will be signed out.</p>
         <button className="btn-danger" disabled={a.busy} onClick={() => { if (confirm('Reset all data to the demo seed? Everything created so far is deleted.')) a.run(async () => { await api.post('/demo/reset'); location.href = '/'; }); }}>Reset demo data</button>
         <ErrorNote error={a.error} />
       </Section>

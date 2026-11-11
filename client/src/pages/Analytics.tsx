@@ -36,7 +36,7 @@ export default function Analytics() {
     <main className="mx-auto max-w-7xl space-y-5 px-4 py-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Analytics</h1>
+          <h1 className="text-2xl font-bold text-ink">Analytics</h1>
           <p className="muted">Across every project you are a party to{user.role === 'client' ? ' as client' : user.role === 'freelancer' ? ' as freelancer' : ''}. {h.simulated && <SimTag label="includes SIMULATED transactions" />}</p>
         </div>
         <div className="flex gap-2">
@@ -49,15 +49,15 @@ export default function Analytics() {
         <>
           <div className="card grid grid-cols-2 gap-4 p-4 md:grid-cols-5">
             <Stat label="Platform fees" value={money(h.platformFees)} sub="SaaS revenue retained" />
-            <Stat label="First-pass QA rate" value={h.firstPassRate === null ? '—' : `${h.firstPassRate}%`} sub="requirements PASS on latest run" tone={h.firstPassRate >= 70 ? 'text-emerald-700' : undefined} />
+            <Stat label="First-pass QA rate" value={h.firstPassRate === null ? '—' : `${h.firstPassRate}%`} sub="requirements PASS on latest run" tone={h.firstPassRate >= 70 ? 'text-released' : undefined} />
             <Stat label="Escalation rate" value={h.escalationRate === null ? '—' : `${h.escalationRate}%`} sub="submissions sent to experts" />
             <Stat label="Expert reviews closed" value={h.reviewsClosed} sub="with a quorum result" />
-            <Stat label="Released to date" value={money(a.overTime.at(-1)?.released ?? 0)} sub={`of ${money(a.overTime.at(-1)?.funded ?? 0)} funded`} tone="text-emerald-700" />
+            <Stat label="Released to date" value={money(a.overTime.at(-1)?.released ?? 0)} sub={`of ${money(a.overTime.at(-1)?.funded ?? 0)} funded`} tone="text-released" />
           </div>
 
           <div className="grid gap-5 lg:grid-cols-2">
             {/* 1 · Money over time — line, cumulative */}
-            <Section title="Funding & earnings over time" actions={<span className="text-xs text-slate-500">cumulative, PayPal-confirmed</span>}>
+            <Section title="Funding & earnings over time" actions={<span className="text-xs text-ink-3">cumulative, PayPal-confirmed</span>}>
               <div style={{ height: 280 }}>
                 <AgCharts options={{
                   ...common,
@@ -73,7 +73,7 @@ export default function Analytics() {
                   ] as any,
                 }} />
               </div>
-              <p className="mt-1 text-xs text-slate-500">Funded = advances captured + milestone authorizations. Released = payouts actually confirmed by PayPal.</p>
+              <p className="mt-1 text-xs text-ink-3">Funded = advances captured + milestone authorizations. Released = payouts actually confirmed by PayPal.</p>
             </Section>
 
             {/* 2 · QA outcomes by category — stacked bar */}
@@ -93,7 +93,7 @@ export default function Analytics() {
                   ] as any,
                 }} />
               </div>
-              <p className="mt-1 text-xs text-slate-500">Latest completed QA run per milestone. Counts are labelled on each segment, so colour is never the only cue.</p>
+              <p className="mt-1 text-xs text-ink-3">Latest completed QA run per milestone. Counts are labelled on each segment, so colour is never the only cue.</p>
             </Section>
           </div>
 
@@ -115,23 +115,23 @@ export default function Analytics() {
                   }] as any,
                 }} />
               </div>
-              <p className="mt-1 text-xs text-slate-500">By latest recommendation per milestone — amounts come from the approved agreement, never from a confidence score.</p>
+              <p className="mt-1 text-xs text-ink-3">By latest recommendation per milestone — amounts come from the approved agreement, never from a confidence score.</p>
             </Section>
 
             {/* 4 · Expert panel heatmap — CSS grid (AG Charts community has no heatmap series) */}
             <Section title="Expert panel outcomes" className="lg:col-span-3"
-              actions={<span className="text-xs text-slate-500">custom grid — AG Charts community has no heatmap series</span>}>
+              actions={<span className="text-xs text-ink-3">custom grid — AG Charts community has no heatmap series</span>}>
               {!heat ? <p className="muted">No revealed expert reviews yet. Votes stay sealed until a review closes.</p> : (
                 <div className="space-y-3">
                   <div className="overflow-x-auto">
                     <table className="text-sm">
                       <thead>
                         <tr>
-                          <th className="sticky left-0 bg-white py-1 pr-3 text-left text-xs font-semibold uppercase text-slate-500">Reviewer</th>
+                          <th className="sticky left-0 bg-white py-1 pr-3 text-left text-xs font-semibold uppercase text-ink-3">Reviewer</th>
                           {heat.cols.map((c) => { const r = a.expertRows.find((x: any) => `${x.projectId}|${x.milestoneId}|${x.requirementId}` === c)!; return (
-                            <th key={c} className="px-1 pb-1 text-center text-[11px] font-semibold text-slate-600" title={r.project}>{r.milestoneId}<br /><span className="font-normal text-slate-500">{r.requirementId}</span></th>
+                            <th key={c} className="px-1 pb-1 text-center text-[11px] font-semibold text-ink-2" title={r.project}>{r.milestoneId}<br /><span className="font-normal text-ink-3">{r.requirementId}</span></th>
                           ); })}
-                          <th className="px-2 text-center text-[11px] font-semibold uppercase text-slate-500">Panel</th>
+                          <th className="px-2 text-center text-[11px] font-semibold uppercase text-ink-3">Panel</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -167,19 +167,19 @@ export default function Analytics() {
                   </div>
                   <div className="flex flex-wrap gap-3 text-xs">
                     {VOTES.map((v) => <span key={v} className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded" style={{ background: VOTE_COLOR[v] }} />{label(v)} ({v[0] === 'P' ? 'P' : v[0] === 'I' ? 'I' : v[0]})</span>)}
-                    <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded bg-slate-200" />No vote (·)</span>
-                    <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded border-2 border-slate-500 bg-white" />Outlined cell = aggregated panel result (? = inconclusive)</span>
+                    <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded bg-rule" />No vote (·)</span>
+                    <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded border-2 border-ink-3 bg-white" />Outlined cell = aggregated panel result (? = inconclusive)</span>
                   </div>
                   {/* Compact tally — a second chart of the same votes would just duplicate the grid above. */}
-                  <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Votes cast</span>
+                  <div className="flex flex-wrap items-center gap-2 border-t border-rule pt-3">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-ink-3">Votes cast</span>
                     {a.voteTally.filter((v: any) => v.count > 0).map((v: any) => (
-                      <span key={v.vote} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 px-2 py-1 text-xs">
+                      <span key={v.vote} className="inline-flex items-center gap-1.5 rounded-[3px] bg-paper px-2 py-1 text-xs">
                         <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: VOTE_COLOR[v.vote] }} />
-                        <b className="text-slate-800">{v.count}</b> <span className="text-slate-600">{label(v.vote)}</span>
+                        <b className="text-ink">{v.count}</b> <span className="text-ink-2">{label(v.vote)}</span>
                       </span>
                     ))}
-                    <span className="text-xs text-slate-500">across {new Set(a.expertRows.map((r: any) => r.reviewId)).size} revealed panel(s)</span>
+                    <span className="text-xs text-ink-3">across {new Set(a.expertRows.map((r: any) => r.reviewId)).size} revealed panel(s)</span>
                   </div>
                 </div>
               )}
@@ -215,7 +215,7 @@ export default function Analytics() {
               </Section>
             </div>
           )}
-          <p className="text-xs text-slate-500">Sequential ramp available for future magnitude charts: {SEQ_BLUE.length}-step single-hue blue. Status colours (good / warning / serious / critical) are reserved and never reused as series colours.</p>
+          <p className="text-xs text-ink-3">Sequential ramp available for future magnitude charts: {SEQ_BLUE.length}-step single-hue blue. Status colours (good / warning / serious / critical) are reserved and never reused as series colours.</p>
         </>
       )}
     </main>

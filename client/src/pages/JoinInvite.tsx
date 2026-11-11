@@ -19,9 +19,9 @@ export default function JoinInvite() {
         <ErrorNote error={a.error} />
         {inv && (
           <>
-            <p className="text-slate-700"><b>{inv.invitedBy}</b> invited you to join <b>{inv.title}</b> as the <b>{inv.role}</b>.</p>
+            <p className="text-ink"><b>{inv.invitedBy}</b> invited you to join <b>{inv.title}</b> as the <b>{inv.role}</b>.</p>
             {inv.description && <p className="muted">{inv.description}</p>}
-            {inv.draft && <div className="rounded-lg bg-slate-50 p-3 text-sm">Draft agreement v{inv.draft.version}: {inv.draft.requirements.length} requirements, {inv.draft.milestones.length} milestones, budget {money(inv.draft.budget)}. You review and approve it after joining — joining does not approve anything.</div>}
+            {inv.draft && <div className="rounded-[3px] bg-paper p-3 text-sm">Draft agreement v{inv.draft.version}: {inv.draft.requirements.length} requirements, {inv.draft.milestones.length} milestones, budget {money(inv.draft.budget)}. You review and approve it after joining — joining does not approve anything.</div>}
             {user.role !== inv.role && <ErrorNote error={`You are signed in as a ${user.role}. Switch to a ${inv.role} account to accept.`} />}
             <div className="flex justify-end gap-2">
               <button className="btn-secondary" onClick={() => nav('/')}>Not now</button>

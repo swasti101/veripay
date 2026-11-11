@@ -21,7 +21,7 @@ export default function CreateProject() {
   return (
     <main className="mx-auto max-w-4xl space-y-5 px-4 py-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">New project</h1>
+        <h1 className="text-2xl font-bold text-ink">New project</h1>
         <p className="muted">As the {user.role}, you create the project and upload the SOW. AI extracts requirements, milestones and payment terms for you to review. You then invite the {user.role === 'client' ? 'freelancer' : 'client'}; nothing is binding until both of you approve.</p>
       </div>
       <div className="card space-y-4 p-5">
@@ -46,7 +46,7 @@ export default function CreateProject() {
             <input type="file" accept=".txt,.md,text/plain,text/markdown" onChange={(e) => setFile(e.target.files?.[0] || null)} />
             {file && <button className="btn-ghost" onClick={() => setFile(null)}>Clear file</button>}
           </div>
-          <p className="mt-2 text-xs text-slate-500">Extraction engine: <b>{config?.ai.label}</b>. It only extracts what the SOW states and flags anything vague or missing for clarification — it never invents requirements or amounts.</p>
+          <p className="mt-2 text-xs text-ink-3">Extraction engine: <b>{config?.ai.label}</b>. It only extracts what the SOW states and flags anything vague or missing for clarification — it never invents requirements or amounts.</p>
         </div>
         <ErrorNote error={a.error} />
         <div className="flex justify-end gap-2">

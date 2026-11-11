@@ -57,7 +57,7 @@ export function heuristicExtract(text: string): SOWResult {
     if (r && !/^milestone/i.test(r[2])) {
       const body = r[3];
       const [desc, acc] = body.split(/acceptance:/i);
-      const criteria = (acc || desc).split(/;|\.\s+/).map((s) => s.trim().replace(/\.$/, '')).filter((s) => s.length > 3);
+      const criteria = (acc || desc).replace(/\[\s*\$[\d,]+\s*\]/g, '').split(/;|\.\s+/).map((s) => s.trim().replace(/\.$/, '')).filter((s) => s.length > 3);
       const amt = body.match(/\[\s*\$([\d,]+)\s*\]/);
       const vague = vagueTerm(body);
       reqs.push({

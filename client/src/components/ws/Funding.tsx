@@ -26,27 +26,27 @@ export default function Funding({ v, reload }: WsProps) {
   return (
     <div className="space-y-4">
       <Section title="Funding commitment vs. payment release">
-        <p className="mb-3 text-sm text-slate-600"><b>Funding</b> is what the client commits through PayPal. <b>Release</b> is what the freelancer receives after a milestone is assessed and approved. These are separate decisions and separate numbers.</p>
+        <p className="mb-3 text-sm text-ink-2"><b>Funding</b> is what the client commits through PayPal. <b>Release</b> is what the freelancer receives after a milestone is assessed and approved. These are separate decisions and separate numbers.</p>
         <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
           <Stat label="Total budget" value={money(m.budget)} />
           <Stat label="Initial advance" value={money(m.advance)} sub={<Badge>{p.advance.status}</Badge>} />
           <Stat label="Amount committed" value={money(m.committed)} sub="per funding plan" />
           <Stat label="Authorized / captured" value={`${money(m.authorized)} / ${money(m.captured)}`} sub="PayPal-confirmed" />
           <Stat label="Awaiting funding" value={money(m.awaitingFunding)} />
-          <Stat label="Eligible for release" value={money(m.eligible)} tone="text-emerald-700" />
+          <Stat label="Eligible for release" value={money(m.eligible)} tone="text-released" />
           <Stat label="Already paid" value={money(m.paid)} />
-          <Stat label="Under review / dispute" value={money(m.underReview)} tone="text-violet-700" />
+          <Stat label="Under review / dispute" value={money(m.underReview)} tone="text-panel" />
           <Stat label="Expert fees (separate)" value={money(m.expertFees)} />
         </div>
       </Section>
 
       <Section title="Funding plan" actions={ag.fundingPlan && <Badge tone="blue">{`Chosen: ${ag.fundingPlan.option}`}</Badge>}>
-        {!draft ? <p className="mb-3 text-sm text-slate-600">The funding plan is part of the locked agreement v{active.version}. To change it, propose a new agreement version.</p>
-          : party !== 'client' ? <p className="mb-3 text-sm text-slate-600">The client chooses the plan; you accept it by approving the agreement.</p> : null}
+        {!draft ? <p className="mb-3 text-sm text-ink-2">The funding plan is part of the locked agreement v{active.version}. To change it, propose a new agreement version.</p>
+          : party !== 'client' ? <p className="mb-3 text-sm text-ink-2">The client chooses the plan; you accept it by approving the agreement.</p> : null}
         <div className="grid gap-3 md:grid-cols-3">
           {OPTIONS.map((o) => (
-            <button key={o.k} disabled={!draft || party !== 'client'} onClick={() => setOpt(o.k)} className={`rounded-xl border p-3 text-left transition ${opt === o.k ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200' : 'border-slate-200 bg-white'} disabled:cursor-default`}>
-              <div className="font-semibold text-slate-900">{o.title}</div><p className="mt-1 text-xs text-slate-600">{o.text}</p>
+            <button key={o.k} disabled={!draft || party !== 'client'} onClick={() => setOpt(o.k)} className={`rounded-[4px] border p-3 text-left transition ${opt === o.k ? 'border-seal bg-seal-wash ring-2 ring-seal' : 'border-rule bg-white'} disabled:cursor-default`}>
+              <div className="font-semibold text-ink">{o.title}</div><p className="mt-1 text-xs text-ink-2">{o.text}</p>
               <div className="mt-2 text-sm font-medium">Commit now: {money(o.k === 'FULL' ? ag.budget : o.k === 'ADVANCE' ? ag.advanceAmount : ag.advanceAmount + ag.milestones.filter((x: any) => sel.includes(x.id)).reduce((s: number, x: any) => s + x.amount, 0))}</div>
             </button>
           ))}
@@ -59,10 +59,10 @@ export default function Funding({ v, reload }: WsProps) {
         {draft && party === 'client' && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button className="btn-primary" disabled={!opt || a.busy} onClick={() => a.run(async () => { const r = await api.post(`/projects/${p.id}/agreement/funding-plan`, { option: opt, committedMilestones: sel }); setRec(r.draft.fundingPlan.aiRecommendation); await reload(); })}>Save funding plan</button>
-            <span className="text-xs text-slate-500">Saving clears approvals on the draft — the freelancer must accept the plan.</span>
+            <span className="text-xs text-ink-3">Saving clears approvals on the draft — the freelancer must accept the plan.</span>
           </div>
         )}
-        {(rec || ag.fundingPlan?.aiRecommendation) && <div className="mt-3 rounded-lg bg-indigo-50 p-3 text-sm text-indigo-900"><b>AI recommendation (advisory): {(rec || ag.fundingPlan.aiRecommendation).option}.</b> {(rec || ag.fundingPlan.aiRecommendation).rationale}</div>}
+        {(rec || ag.fundingPlan?.aiRecommendation) && <div className="mt-3 rounded-[3px] bg-seal-wash p-3 text-sm text-seal"><b>AI recommendation (advisory): {(rec || ag.fundingPlan.aiRecommendation).option}.</b> {(rec || ag.fundingPlan.aiRecommendation).rationale}</div>}
         <ErrorNote error={a.error} />
       </Section>
 
@@ -70,8 +70,8 @@ export default function Funding({ v, reload }: WsProps) {
         {!active ? <p className="muted">Funding opens after both parties approve the agreement (scope, milestones and payment terms).</p> : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-1">Item</th><th>Amount</th><th>Committed?</th><th>Funded</th><th>Status</th><th>Authorization</th><th>Released / paid</th><th /></tr></thead>
-              <tbody className="divide-y divide-slate-100">
+              <thead className="text-left text-xs uppercase text-ink-3"><tr><th className="py-1">Item</th><th>Amount</th><th>Committed?</th><th>Funded</th><th>Status</th><th>Authorization</th><th>Released / paid</th><th /></tr></thead>
+              <tbody className="divide-y divide-rule">
                 {active.advanceAmount > 0 && (
                   <tr><td className="py-2 font-medium">Advance (paid to freelancer on funding)</td><td>{money(active.advanceAmount)}</td><td>yes</td><td>{['FUNDING_REQUIRED', 'FUNDING_PENDING', 'PAYMENT_FAILED'].includes(p.advance.status) ? money(0) : money(active.advanceAmount)}</td><td><Badge>{p.advance.status}</Badge></td><td>capture</td><td>{money(p.advance.paid)}</td>
                     <td className="text-right">{party === 'client' && ['FUNDING_REQUIRED', 'FUNDING_PENDING', 'PAYMENT_FAILED'].includes(p.advance.status) && <PayPalCheckout projectId={p.id} target="ADVANCE" amount={active.advanceAmount} intent="CAPTURE" label="Pay advance" onDone={reload} />}</td></tr>
@@ -82,7 +82,7 @@ export default function Funding({ v, reload }: WsProps) {
                   const need = x.amount - funded(x.id);
                   return (
                     <tr key={x.id}>
-                      <td className="py-2 font-medium">{x.id} {x.title}<div className="text-xs text-slate-500">due {d(x.dueDate)}</div></td>
+                      <td className="py-2 font-medium">{x.id} {x.title}<div className="text-xs text-ink-3">due {d(x.dueDate)}</div></td>
                       <td>{money(x.amount)}</td><td>{committed ? 'yes (up front)' : 'when due'}</td><td>{money(funded(x.id))}</td><td><Badge>{s?.fundingStatus}</Badge></td>
                       <td className="text-xs">{s?.authorizationExpires ? <>expires {d(s.authorizationExpires)}<br />honor period to {d(s.honorPeriodEnds)}</> : '—'}</td>
                       <td>{money(s?.captured || 0)} / {money(s?.paid || 0)}</td>
@@ -92,7 +92,7 @@ export default function Funding({ v, reload }: WsProps) {
                 })}
               </tbody>
             </table>
-            <p className="mt-3 text-xs text-slate-500">Funding status changes only after the server verifies PayPal's response. A PayPal authorization cannot be held indefinitely (≤29 days, 3-day honor period), so long projects fund milestones as they become due. Funds held by authorization are not escrow and VeriPay does not operate a wallet.</p>
+            <p className="mt-3 text-xs text-ink-3">Funding status changes only after the server verifies PayPal's response. A PayPal authorization cannot be held indefinitely (≤29 days, 3-day honor period), so long projects fund milestones as they become due. Funds held by authorization are not escrow and VeriPay does not operate a wallet.</p>
           </div>
         )}
       </Section>

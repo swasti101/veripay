@@ -39,8 +39,8 @@ export default function Overview({ v, reload }: WsProps) {
               <div className="space-y-2 text-sm">
                 <p>Share this invite code or link with the {other}{p.invite.email ? ` (${p.invite.email})` : ''}:</p>
                 <div className="flex flex-wrap items-center gap-2">
-                  <code className="rounded bg-slate-100 px-2 py-1 text-base font-bold tracking-widest">{p.invite.code}</code>
-                  <code className="rounded bg-slate-100 px-2 py-1 text-xs">{location.origin}/join/{p.invite.code}</code>
+                  <code className="rounded bg-paper px-2 py-1 text-base font-bold tracking-widest">{p.invite.code}</code>
+                  <code className="rounded bg-paper px-2 py-1 text-xs">{location.origin}/join/{p.invite.code}</code>
                   <button className="btn-secondary" onClick={() => navigator.clipboard.writeText(`${location.origin}/join/${p.invite.code}`)}>Copy link</button>
                 </div>
                 <p className="muted">Demo tip: switch user to <b>{other === 'client' ? 'Jamie Chen (DEMO client)' : 'Sam Okafor (DEMO freelancer)'}</b> and join with the code.</p>
@@ -59,7 +59,7 @@ export default function Overview({ v, reload }: WsProps) {
           {actions.length === 0 ? <p className="muted">Nothing is waiting on you right now.</p> : (
             <ul className="space-y-1.5">
               {actions.map((x, i) => (
-                <li key={i} className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                <li key={i} className="flex items-center justify-between gap-2 rounded-[3px] bg-paper px-3 py-2 text-sm">
                   <span>{x.action}</span><Link to={`../${x.tab}`} relative="path" className="btn-secondary">Go</Link>
                 </li>
               ))}
@@ -71,8 +71,8 @@ export default function Overview({ v, reload }: WsProps) {
           {!ag ? <p className="muted">Upload a SOW to extract milestones.</p> : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-1">Milestone</th><th>Due</th><th>Amount</th><th>Funding</th><th>Work</th><th className="text-right">Paid</th></tr></thead>
-                <tbody className="divide-y divide-slate-100">
+                <thead className="text-left text-xs uppercase text-ink-3"><tr><th className="py-1">Milestone</th><th>Due</th><th>Amount</th><th>Funding</th><th>Work</th><th className="text-right">Paid</th></tr></thead>
+                <tbody className="divide-y divide-rule">
                   {ag.advanceAmount > 0 && <tr><td className="py-2 font-medium">Advance</td><td>on signing</td><td>{money(ag.advanceAmount)}</td><td><Badge>{p.advance.status}</Badge></td><td>—</td><td className="text-right">{money(p.advance.paid)}</td></tr>}
                   {ag.milestones.map((m: any) => {
                     const st = p.milestoneStates.find((s: any) => s.milestoneId === m.id);
@@ -85,7 +85,7 @@ export default function Overview({ v, reload }: WsProps) {
         </Section>
 
         <Section title="Scope summary">
-          <p className="text-sm text-slate-700">{ag?.extraction?.scope || p.description || '—'}</p>
+          <p className="text-sm text-ink">{ag?.extraction?.scope || p.description || '—'}</p>
           {ag?.extraction?.exclusions?.length > 0 && <p className="mt-2 text-sm"><b>Exclusions:</b> {ag.extraction.exclusions.join('; ')}</p>}
         </Section>
       </div>
@@ -94,7 +94,7 @@ export default function Overview({ v, reload }: WsProps) {
         <Section title="AI Project Manager">
           {pm.length === 0 ? <p className="muted">No messages yet.</p> : (
             <ul className="space-y-2">
-              {pm.map((m: any) => <li key={m.id} className="rounded-lg bg-indigo-50/60 p-2 text-sm"><div className="text-[11px] font-semibold text-indigo-700">{m.agent} · {dt(m.createdAt)}</div>{m.text}</li>)}
+              {pm.map((m: any) => <li key={m.id} className="border-l-2 border-rule-strong pl-3 text-[13px] text-ink-2"><div className="mb-0.5 text-[11px] font-medium text-ink-3">{m.agent} · {dt(m.createdAt)}</div>{m.text}</li>)}
             </ul>
           )}
           <Link to="../conversation" relative="path" className="btn-secondary mt-3 w-full">Open conversation</Link>
@@ -103,10 +103,10 @@ export default function Overview({ v, reload }: WsProps) {
           <Section title="Demo story progress">
             <ol className="space-y-1 text-sm">
               {STORY.map(([label, done], i) => (
-                <li key={i} className="flex gap-2"><span className={done(v) ? 'text-emerald-600' : 'text-slate-300'}>{done(v) ? '✔' : '○'}</span><span className={done(v) ? 'text-slate-700' : 'text-slate-500'}>{label}</span></li>
+                <li key={i} className="flex gap-2"><span className={done(v) ? 'text-released' : 'text-ink-3'}>{done(v) ? '✔' : '○'}</span><span className={done(v) ? 'text-ink' : 'text-ink-3'}>{label}</span></li>
               ))}
             </ol>
-            <p className="mt-2 text-xs text-slate-500">Steps 1–6 are pre-seeded (M1 already paid). Continue from step 7 as the freelancer. To see steps 1–5 live, create a new project with the sample SOW.</p>
+            <p className="mt-2 text-xs text-ink-3">Steps 1–6 are pre-seeded (M1 already paid). Continue from step 7 as the freelancer. To see steps 1–5 live, create a new project with the sample SOW.</p>
           </Section>
         )}
       </div>

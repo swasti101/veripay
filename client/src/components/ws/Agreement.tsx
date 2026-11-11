@@ -42,28 +42,28 @@ export default function Agreement({ v, reload }: WsProps) {
     <div className="space-y-4">
       <Section title={<span className="flex items-center gap-2">Agreement v{shown.version} <Badge>{shown.status}</Badge></span>}
         actions={<>
-          {draft && <span className="text-sm text-slate-600">Client: {draft.approvals.client ? <Badge tone="green">approved</Badge> : <Badge>pending</Badge>} Freelancer: {draft.approvals.freelancer ? <Badge tone="green">approved</Badge> : <Badge>pending</Badge>}</span>}
+          {draft && <span className="text-sm text-ink-2">Client: {draft.approvals.client ? <Badge tone="green">approved</Badge> : <Badge>pending</Badge>} Freelancer: {draft.approvals.freelancer ? <Badge tone="green">approved</Badge> : <Badge>pending</Badge>}</span>}
           {draft && dirty && <button className="btn-secondary" disabled={a.busy} onClick={() => { setDirty(false); }}>Discard</button>}
           {draft && dirty && <button className="btn-primary" disabled={a.busy} onClick={save}>Save changes</button>}
           {draft && !dirty && !draft.approvals[party] && <button className="btn-success" disabled={a.busy || issues.length > 0 || !p.clientId || !p.freelancerId} onClick={() => a.run(async () => { await api.post(`/projects/${p.id}/agreement/approve`); await reload(); })}>Approve v{draft.version}</button>}
         </>}>
         <div className="space-y-2 text-sm">
-          <p className="text-slate-600">{shown.changeSummary} · extracted by <b>{shown.extraction?.source}</b></p>
+          <p className="text-ink-2">{shown.changeSummary} · extracted by <b>{shown.extraction?.source}</b></p>
           {draft ? (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900">
+            <div className="rounded-[3px] border border-hold/40 bg-hold-wash p-3 text-hold">
               Draft under negotiation. Any edit by either party clears both approvals, so neither side can change terms the other already accepted. The version locks as the payment baseline only when <b>both</b> approve.
               {active && <> The approved v{active.version} stays in force until then.</>}
             </div>
           ) : (
-            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-emerald-900">
+            <div className="flex flex-wrap items-center gap-2 rounded-[3px] border border-released/40 bg-released-wash p-3 text-released">
               Locked baseline approved by both parties. Changes require a new version approved by both.
               <input className="input max-w-sm" placeholder="Describe the change you want to propose" value={summary} onChange={(e) => setSummary(e.target.value)} />
               <button className="btn-secondary" disabled={a.busy || !summary.trim()} onClick={() => a.run(async () => { await api.post(`/projects/${p.id}/agreement/propose-change`, { changeSummary: summary }); setSummary(''); await reload(); })}>Propose change (new version)</button>
             </div>
           )}
-          {(!p.clientId || !p.freelancerId) && <p className="text-amber-700">Both parties must join before the agreement can be approved.</p>}
-          {draft && issues.map((i) => <div key={i} className="text-rose-700">• {i}</div>)}
-          {unclear.length > 0 && <div className="text-violet-700">• {unclear.map((r: any) => r.id).join(', ')} have unmeasurable wording without a clarification. They can be approved, but QA will mark them NEEDS_CLARIFICATION and may escalate to experts.</div>}
+          {(!p.clientId || !p.freelancerId) && <p className="text-hold">Both parties must join before the agreement can be approved.</p>}
+          {draft && issues.map((i) => <div key={i} className="text-refuse">• {i}</div>)}
+          {unclear.length > 0 && <div className="text-panel">• {unclear.map((r: any) => r.id).join(', ')} have unmeasurable wording without a clarification. They can be approved, but QA will mark them NEEDS_CLARIFICATION and may escalate to experts.</div>}
           <ErrorNote error={a.error} />
           {a.busy && <Spinner />}
         </div>
@@ -82,8 +82,8 @@ export default function Agreement({ v, reload }: WsProps) {
                 </select>
               ) : <span>{shown.partialPaymentRule.replace(/_/g, ' ').toLowerCase()}</span>}
             </div>
-            <div className="col-span-2"><label className="label">Funding plan</label>{shown.fundingPlan ? <Badge tone="blue">{shown.fundingPlan.option}</Badge> : <span className="text-amber-700">not chosen (client, Funding tab)</span>}</div>
-            <div className="col-span-2"><label className="label">Payment terms in SOW</label><p className="text-slate-600">{shown.extraction?.paymentTerms || '—'}</p></div>
+            <div className="col-span-2"><label className="label">Funding plan</label>{shown.fundingPlan ? <Badge tone="blue">{shown.fundingPlan.option}</Badge> : <span className="text-hold">not chosen (client, Funding tab)</span>}</div>
+            <div className="col-span-2"><label className="label">Payment terms in SOW</label><p className="text-ink-2">{shown.extraction?.paymentTerms || '—'}</p></div>
           </div>
         </Section>
         <Section title="Expert review terms" className="lg:col-span-1">
@@ -95,7 +95,7 @@ export default function Agreement({ v, reload }: WsProps) {
             <div><label className="label">Fee paid by</label>
               {edit ? <select className="input" value={edit.expertReview.feePayer} onChange={(e) => upd((x) => (x.expertReview.feePayer = e.target.value))}><option value="client">Client</option><option value="freelancer">Freelancer</option><option value="split">Split 50/50</option></select> : shown.expertReview.feePayer}
             </div>
-            <p className="col-span-2 text-xs text-slate-500">Mode: <b>ADVISORY</b> — the panel produces a recommendation both parties review and acknowledge; no automatic payment consequence. Fixed fee is paid for a valid completed review regardless of the vote and is never deducted from the freelancer's pay.</p>
+            <p className="col-span-2 text-xs text-ink-3">Mode: <b>ADVISORY</b> — the panel produces a recommendation both parties review and acknowledge; no automatic payment consequence. Fixed fee is paid for a valid completed review regardless of the vote and is never deducted from the freelancer's pay.</p>
           </div>
         </Section>
         <Section title="Extraction details" className="lg:col-span-1">
@@ -103,7 +103,7 @@ export default function Agreement({ v, reload }: WsProps) {
             <div><dt className="label">Scope</dt><dd>{shown.extraction?.scope}</dd></div>
             <div><dt className="label">Exclusions</dt><dd>{shown.extraction?.exclusions?.join('; ') || '—'}</dd></div>
             <div><dt className="label">Assumptions</dt><dd>{shown.extraction?.assumptions?.join('; ') || '—'}</dd></div>
-            <div><dt className="label">Flagged for clarification</dt><dd>{shown.extraction?.ambiguities?.length ? <ul className="list-disc pl-4">{shown.extraction.ambiguities.map((x: any, i: number) => <li key={i}>{x.text} <span className="text-xs text-slate-500">(ask {x.askParty})</span></li>)}</ul> : 'none'}</dd></div>
+            <div><dt className="label">Flagged for clarification</dt><dd>{shown.extraction?.ambiguities?.length ? <ul className="list-disc pl-4">{shown.extraction.ambiguities.map((x: any, i: number) => <li key={i}>{x.text} <span className="text-xs text-ink-3">(ask {x.askParty})</span></li>)}</ul> : 'none'}</dd></div>
           </dl>
         </Section>
       </div>
@@ -111,8 +111,8 @@ export default function Agreement({ v, reload }: WsProps) {
       <Section title="Milestones" actions={edit && <button className="btn-secondary" onClick={() => upd((x) => x.milestones.push({ id: `M${x.milestones.length + 1}`, title: 'New milestone', description: '', startDate: '', dueDate: '', amount: 0, dependsOn: [] }))}>+ Milestone</button>}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase text-slate-500"><tr><th>ID</th><th>Title</th><th>Start</th><th>Due</th><th>Amount</th><th>Requirements</th>{edit && <th />}</tr></thead>
-            <tbody className="divide-y divide-slate-100">
+            <thead className="text-left text-xs uppercase text-ink-3"><tr><th>ID</th><th>Title</th><th>Start</th><th>Due</th><th>Amount</th><th>Requirements</th>{edit && <th />}</tr></thead>
+            <tbody className="divide-y divide-rule">
               {shown.milestones.map((m: any, i: number) => (
                 <tr key={i}>
                   <td className="py-1.5 font-semibold">{m.id}</td>
@@ -141,9 +141,9 @@ export default function Agreement({ v, reload }: WsProps) {
         ) : (
           <div className="space-y-3">
             {edit.requirements.map((r: any, i: number) => (
-              <div key={i} className={`rounded-lg border p-3 ${r.ambiguity && !r.clarification ? 'border-violet-300 bg-violet-50/40' : 'border-slate-200'}`}>
+              <div key={i} className={`rounded-[3px] border p-3 ${r.ambiguity && !r.clarification ? 'border-panel/40 bg-panel-wash/40' : 'border-rule'}`}>
                 <div className="grid gap-2 md:grid-cols-12">
-                  <div className="md:col-span-1"><label className="label">ID</label><div className="pt-1.5 text-sm font-semibold">{r.id}</div><div className="text-xs text-slate-500">{r.sowRef}</div></div>
+                  <div className="md:col-span-1"><label className="label">ID</label><div className="pt-1.5 text-sm font-semibold">{r.id}</div><div className="text-xs text-ink-3">{r.sowRef}</div></div>
                   <div className="md:col-span-4"><label className="label">Title</label><input className="input" value={r.title} onChange={(e) => upd((x) => (x.requirements[i].title = e.target.value))} /></div>
                   <div className="md:col-span-2"><label className="label">Milestone</label><select className="input" value={r.milestoneId} onChange={(e) => upd((x) => (x.requirements[i].milestoneId = e.target.value))}>{edit.milestones.map((m: any) => <option key={m.id}>{m.id}</option>)}</select></div>
                   <div className="md:col-span-2"><label className="label">Amount ($)</label><input className="input" type="number" value={r.amount ?? ''} onChange={(e) => upd((x) => (x.requirements[i].amount = e.target.value === '' ? null : Number(e.target.value)))} /></div>
@@ -154,9 +154,9 @@ export default function Agreement({ v, reload }: WsProps) {
                     <div className="flex gap-3 pt-1 text-sm">{['visual', 'functional', 'document'].map((k) => (
                       <label key={k} className="flex items-center gap-1"><input type="checkbox" checked={r.evidenceRequired.includes(k)} onChange={(e) => upd((x) => { const s = new Set(x.requirements[i].evidenceRequired); e.target.checked ? s.add(k) : s.delete(k); x.requirements[i].evidenceRequired = [...s]; })} />{k}</label>
                     ))}</div>
-                    {r.ambiguity && <p className="mt-2 text-xs text-violet-800">⚠ {r.ambiguity}</p>}
+                    {r.ambiguity && <p className="mt-2 text-xs text-panel">⚠ {r.ambiguity}</p>}
                   </div>
-                  <div className="md:col-span-12"><label className="label">Approved clarification {r.ambiguity && !r.clarification && <span className="text-violet-700">(recommended)</span>}</label><input className="input" placeholder="e.g. Results update within 500 ms of typing; matching is case-insensitive substring on product name" value={r.clarification || ''} onChange={(e) => upd((x) => (x.requirements[i].clarification = e.target.value))} /></div>
+                  <div className="md:col-span-12"><label className="label">Approved clarification {r.ambiguity && !r.clarification && <span className="text-panel">(recommended)</span>}</label><input className="input" placeholder="e.g. Results update within 500 ms of typing; matching is case-insensitive substring on product name" value={r.clarification || ''} onChange={(e) => upd((x) => (x.requirements[i].clarification = e.target.value))} /></div>
                 </div>
               </div>
             ))}
@@ -166,18 +166,18 @@ export default function Agreement({ v, reload }: WsProps) {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Section title="Version history">
-          <ul className="divide-y divide-slate-100 text-sm">
+          <ul className="divide-y divide-rule text-sm">
             {[...p.agreementVersions].reverse().map((x: any) => (
               <li key={x.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                 <span><b>v{x.version}</b> <Badge>{x.status}</Badge> {x.changeSummary}</span>
-                <span className="text-xs text-slate-500">client {x.approvals.client ? dt(x.approvals.client) : '—'} · freelancer {x.approvals.freelancer ? dt(x.approvals.freelancer) : '—'} · {money(x.budget)}</span>
+                <span className="text-xs text-ink-3">client {x.approvals.client ? dt(x.approvals.client) : '—'} · freelancer {x.approvals.freelancer ? dt(x.approvals.freelancer) : '—'} · {money(x.budget)}</span>
               </li>
             ))}
           </ul>
         </Section>
         <Section title="Original SOW text" actions={<button className="btn-ghost" onClick={() => setShowSow(!showSow)}>{showSow ? 'Hide' : 'Show'}</button>}>
           {p.isDemo && <SimTag label="DEMO SOW" />}
-          {showSow ? <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-xs">{shown.sowText}</pre> : <p className="muted">{shown.sowText?.length || 0} characters. The SOW is the primary reference for every assessment.</p>}
+          {showSow ? <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-[3px] bg-paper p-3 text-xs">{shown.sowText}</pre> : <p className="muted">{shown.sowText?.length || 0} characters. The SOW is the primary reference for every assessment.</p>}
         </Section>
       </div>
     </div>

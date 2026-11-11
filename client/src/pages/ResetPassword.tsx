@@ -13,7 +13,7 @@ export default function ResetPassword() {
     <div className="mx-auto max-w-md p-10">
       <div className="card p-6">
         <h1 className="text-xl font-bold">Set a new password</h1>
-        {done ? <p className="mt-3 text-emerald-700">Password updated. <button className="btn-primary mt-3" onClick={() => nav('/')}>Sign in</button></p> : (
+        {done ? <p className="mt-3 text-released">Password updated. <button className="btn-primary mt-3" onClick={() => nav('/')}>Sign in</button></p> : (
           <form className="mt-3 space-y-3" onSubmit={(e) => { e.preventDefault(); a.run(async () => { await api.post('/auth/reset-password', { token: sp.get('token'), password: pw }); setDone(true); }); }}>
             <div><label className="label" htmlFor="rp-pw">New password (at least 10 characters)</label><input id="rp-pw" className="input" type="password" autoComplete="new-password" minLength={10} value={pw} onChange={(e) => setPw(e.target.value)} /></div>
             <ErrorNote error={a.error} />

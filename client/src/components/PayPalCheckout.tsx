@@ -62,19 +62,19 @@ export default function PayPalCheckout({ projectId, target, amount, label, inten
       <button className="btn-primary" disabled={disabled} onClick={start}>{label}</button>
       <Modal open={open} onClose={() => { setOpen(false); setOrder(null); }} title={`${intent === 'AUTHORIZE' ? 'Authorize' : 'Pay'} ${money(amount)}`}>
         <div className="space-y-3 text-sm">
-          <p className="text-slate-600">{intent === 'AUTHORIZE'
+          <p className="text-ink-2">{intent === 'AUTHORIZE'
             ? 'PayPal places an authorization (hold) on your account for this milestone. It is captured only after the agreed assessment and your approval. Authorizations are valid up to 29 days (3-day honor period) — this is not escrow.'
             : 'This payment is captured immediately per the approved agreement.'}</p>
           {simulated ? (
-            <div className="space-y-3 rounded-lg border border-amber-300 bg-amber-50 p-3">
-              <div className="flex items-center gap-2"><SimTag /> <span className="text-amber-900">PayPal credentials are not configured. This approval is simulated — no money moves.</span></div>
-              {order ? <div className="text-xs text-amber-900">Simulated order: <code>{order.orderId}</code></div> : !err && <Spinner label="Creating simulated order…" />}
+            <div className="space-y-3 rounded-[3px] border border-hold/40 bg-hold-wash p-3">
+              <div className="flex items-center gap-2"><SimTag /> <span className="text-hold">PayPal credentials are not configured. This approval is simulated — no money moves.</span></div>
+              {order ? <div className="text-xs text-hold">Simulated order: <code>{order.orderId}</code></div> : !err && <Spinner label="Creating simulated order…" />}
               {!done && <button className="btn-primary" disabled={!order || busy} onClick={confirmSim}>{busy ? 'Confirming…' : 'Approve simulated payment'}</button>}
             </div>
           ) : (
-            <div><div className="mb-2 text-xs text-slate-500">PayPal {config?.paypal.mode === 'PAYPAL_SANDBOX' ? 'Sandbox' : 'Live'} — funding status updates only after the server verifies PayPal's response.</div><div ref={ref} />{busy && <Spinner label="Verifying with PayPal…" />}</div>
+            <div><div className="mb-2 text-xs text-ink-3">PayPal {config?.paypal.mode === 'PAYPAL_SANDBOX' ? 'Sandbox' : 'Live'} — funding status updates only after the server verifies PayPal's response.</div><div ref={ref} />{busy && <Spinner label="Verifying with PayPal…" />}</div>
           )}
-          {done && <div className="rounded-lg bg-emerald-50 p-2 text-emerald-800">{done}. Funding status updated.</div>}
+          {done && <div className="rounded-[3px] bg-released-wash p-2 text-released">{done}. Funding status updated.</div>}
           <ErrorNote error={err} />
         </div>
       </Modal>

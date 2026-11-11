@@ -106,8 +106,8 @@ export default function DeliveryGantt({ board }: { board: any }) {
 
   return (
     <>
-      <div ref={host} style={{ height: 560 }} className="overflow-hidden rounded-lg border border-slate-200" />
-      <div className="mt-2 flex flex-wrap gap-4 text-xs text-slate-600">
+      <div ref={host} style={{ height: 560 }} className="overflow-hidden rounded-[3px] border border-rule" />
+      <div className="mt-2 flex flex-wrap gap-4 text-xs text-ink-2">
         <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-5 rounded bg-[#2a78d6]" />Work phase</span>
         <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-5 rounded bg-[#1baf7a]" />Funded tranche</span>
         <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-5 rounded b-legend-blocked" />Blocked on funding</span>

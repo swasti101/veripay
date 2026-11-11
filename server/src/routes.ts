@@ -8,7 +8,7 @@ import { rateLimit } from './services/ratelimit.js';
 import { HttpError, fail, loadProject, touch, msState, newDraftFrom, validateAgreement, finalizeIfApproved, refreshFunding, inviteCode, projectView, partyOf, moneySummary, pendingActions } from './logic.js';
 import { activeAgreement, draftAgreement, askPM, AGENTS, coordinate } from './services/pm.js';
 import { extractSOW, recommendFunding } from './services/sow.js';
-import { runKernelInspection, kernelConfigured } from './services/kernel.js';
+import { runKernelInspection, kernelConfigured, computerAgentMode } from './services/kernel.js';
 import { runQA, classifyFeedback } from './services/qa.js';
 import { computeAllocation, aggregateVotes } from './services/allocation.js';
 import { selectPanel, simulateVote } from './services/experts.js';
@@ -47,7 +47,7 @@ function tx(t: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt' | 'currency'> 
 // ───────────────────────── config / auth ─────────────────────────
 api.get('/config', h(() => ({
   ai: { configured: !!aiProvider(), label: aiLabel() },
-  kernel: { configured: kernelConfigured(), mode: kernelConfigured() ? 'KERNEL_LIVE' : 'DEMO_ADAPTER_HTTP_FETCH' },
+  kernel: { configured: kernelConfigured(), mode: computerAgentMode() },
   paypal: { mode: pp.paypalMode(), clientId: pp.paypalConfigured() ? process.env.PAYPAL_CLIENT_ID : null, webhookVerification: !!process.env.PAYPAL_WEBHOOK_ID },
   apimatic: { sdk: '@paypal/paypal-server-sdk (APIMatic-generated)', openapi: '/openapi.yaml', sdkGeneration: !!process.env.APIMATIC_API_KEY },
   publicBaseUrl: process.env.PUBLIC_BASE_URL || null,
@@ -610,18 +610,21 @@ async function payoutTo(p: Project, mid: string | null, source: Transaction | nu
       p.advance.status = p.advance.paid + p.advance.platformFee >= p.advance.amount - 0.005 ? 'PAID' : 'PARTIALLY_PAID';
     }
   };
-  if (!receiver.paypalEmail && mode !== 'SIMULATED') {
+  // Disbursing money that only ever existed in simulation must stay simulated, even once
+  // real PayPal credentials are configured — otherwise it would move real sandbox funds.
+  const simulatedSource = source?.mode === 'SIMULATED';
+  if (!receiver.paypalEmail && mode !== 'SIMULATED' && !simulatedSource) {
     if (!mid) p.advance.status = 'AWAITING_DISBURSEMENT';
     return tx({ projectId: p.id, milestoneId: mid, type: type as any, amount: net, status: 'AWAITING_DISBURSEMENT', mode, paypal: {}, payee: receiver.id, initiatedBy: actor.id, allocationId, note: `${receiver.name} has not completed payout onboarding (PayPal email). Funds captured; disbursement waits. Platform fee ${feePct}% = $${feeAmount} (deducted on release).` });
   }
   try {
     const batch = id('batch');
-    const r = await pp.sendPayout({ receiverEmail: receiver.paypalEmail || `${receiver.id}@simulated.invalid`, amount: net, note: `${note}${feePct > 0 ? ` (net of ${feePct}% platform fee)` : ''}`, senderItemId: source?.id || batch, batchId: batch });
+    const r = await pp.sendPayout({ receiverEmail: receiver.paypalEmail || `${receiver.id}@simulated.invalid`, amount: net, note: `${note}${feePct > 0 ? ` (net of ${feePct}% platform fee)` : ''}`, senderItemId: source?.id || batch, batchId: batch, simulate: simulatedSource });
     const done = r.itemStatus === 'SUCCESS';
     if (done) apply(net);
     else if (!mid) p.advance.status = 'AWAITING_DISBURSEMENT';
     const rec = tx({ projectId: p.id, milestoneId: mid, type: type as any, amount: net, status: done ? 'SUCCESS' : `PENDING (${r.batchStatus})`, mode: r.mode, paypal: { payoutBatchId: r.payoutBatchId }, payee: receiver.id, initiatedBy: actor.id, allocationId, note: `${note}${feePct > 0 ? ` · gross $${gross}, platform fee ${feePct}% = $${feeAmount}, net to ${receiver.name} $${net}` : ''}` });
-    if (done && feeAmount > 0) tx({ projectId: p.id, milestoneId: mid, type: 'PLATFORM_FEE', amount: feeAmount, status: 'RETAINED', mode, paypal: {}, initiatedBy: 'platform', allocationId, note: `Platform fee ${feePct}% on gross $${gross} retained on the platform PayPal account` });
+    if (done && feeAmount > 0) tx({ projectId: p.id, milestoneId: mid, type: 'PLATFORM_FEE', amount: feeAmount, status: 'RETAINED', mode: r.mode, paypal: {}, initiatedBy: 'platform', allocationId, note: `Platform fee ${feePct}% on gross $${gross} retained on the platform PayPal account` });
     return rec;
   } catch (e: any) {
     if (!mid && who === 'freelancer') p.advance.status = 'AWAITING_DISBURSEMENT';
@@ -735,7 +738,26 @@ function startQA(p: Project, submissionId: string, actor: User) {
       const st = msState(p, sub.milestoneId);
       if (st.workStatus === 'SUBMITTED') st.workStatus = 'QA_COMPLETE';
       audit({ projectId: p.id, actor: 'qa-mediator', actorType: 'agent', action: 'QA_COMPLETED', details: `${out.overall}. ${out.mediatorSummary} (AI: ${out.aiSource})`, refs: [{ type: 'qa', id: run.id }] });
-      postMessage({ projectId: p.id, from: 'ai-coordinator', fromType: 'agent', agent: AGENTS.mediator, audience: 'all', kind: 'notice', text: `QA for ${sub.milestoneId} (revision ${sub.revision}) complete: ${out.overall}. ${out.mediatorSummary} Client: please submit satisfaction feedback.`, ref: { type: 'qa', id: run.id } });
+      // Both parties get the verdict…
+      postMessage({ projectId: p.id, from: 'ai-coordinator', fromType: 'agent', agent: AGENTS.mediator, audience: 'all', kind: 'notice', text: `Verification of ${sub.milestoneId} (revision ${sub.revision}) is done: ${out.overall.replace(/_/g, ' ').toLowerCase()}. ${out.mediatorSummary}`, ref: { type: 'qa', id: run.id } });
+      // …and the freelancer gets concrete, per-requirement next steps, so they can fix and
+      // resubmit without waiting for the client to read the report.
+      const todo = out.results.filter((r) => r.status !== 'PASS' && r.status !== 'OUT_OF_SCOPE');
+      const reqTitle = (rid: string) => ag.requirements.find((x) => x.id === rid)?.title || '';
+      if (todo.length) {
+        const lines = todo.map((r) => {
+          const why = r.guardrail || r.explanation;
+          const ask = r.status === 'UNVERIFIED' ? 'Add evidence that shows it working — a test report, a recording, or a page the agent can reach.'
+            : r.status === 'NEEDS_CLARIFICATION' ? 'The agreed wording cannot be measured. Ask the client what threshold they mean, or offer one in Messages.'
+              : r.status === 'FAIL' ? 'This criterion is not met yet. Fix it and resubmit.'
+                : 'Part of this is in place; finish the rest and resubmit.';
+          return `• ${r.requirementId} ${reqTitle(r.requirementId)} — ${r.status.replace(/_/g, ' ').toLowerCase()}. ${why} ${ask}`;
+        });
+        postMessage({ projectId: p.id, from: 'ai-coordinator', fromType: 'agent', agent: AGENTS.freelancer, audience: 'freelancer', kind: 'evidence_request', text: `Here is what the checks found on ${sub.milestoneId} and what would move each item forward:\n${lines.join('\n')}`, ref: { type: 'qa', id: run.id } });
+      } else {
+        postMessage({ projectId: p.id, from: 'ai-coordinator', fromType: 'agent', agent: AGENTS.freelancer, audience: 'freelancer', kind: 'notice', text: `Every requirement on ${sub.milestoneId} passed verification. The client now reviews it; you will be notified when a payment decision is ready.`, ref: { type: 'qa', id: run.id } });
+      }
+      postMessage({ projectId: p.id, from: 'ai-coordinator', fromType: 'agent', agent: AGENTS.client, audience: 'client', kind: 'notice', text: `${sub.milestoneId} has been verified. Please review it and say how satisfied you are — your feedback is weighed against the agreed scope, so be specific about which requirement any concern relates to.`, ref: { type: 'qa', id: run.id } });
     } catch (e: any) {
       run.status = 'ERROR'; run.error = e.message;
       audit({ projectId: p.id, actor: 'qa-mediator', actorType: 'agent', action: 'QA_ERROR', details: e.message, refs: [{ type: 'qa', id: run.id }] });
@@ -1156,7 +1178,20 @@ api.post('/projects/:id/messages', h(async (req) => {
   audit({ projectId: p.id, actor: u.id, actorType: 'user', action: 'MESSAGE', details: `${party} → ${audience}: ${text.slice(0, 120)}`, refs: [{ type: 'message', id: m.id }] });
   if (req.body?.askPM) {
     const r = await askPM(p, text, party);
-    postMessage({ projectId: p.id, from: 'ai-coordinator', fromType: 'agent', agent: AGENTS.coordinator, audience: party, kind: 'chat', text: r.text + (r.source === 'heuristic' ? '' : '') });
+    postMessage({ projectId: p.id, from: 'ai-coordinator', fromType: 'agent', agent: r.outOfScope ? AGENTS.client : AGENTS.coordinator, audience: party, kind: r.outOfScope ? 'clarification' : 'chat', text: r.text });
+    // When the client asks for new work, prepare the change request for them rather than
+    // making them re-type it — it still needs the freelancer's price and the client's approval.
+    const isRequest = /(add|also|could you|can you|i want|i need|please|would like)/i.test(text);
+    if (r.outOfScope && party === 'client' && isRequest && activeAgreement(p)) {
+      const dup = db().scopeChanges.some((s) => s.projectId === p.id && s.description === text && ['AWAITING_FREELANCER', 'AWAITING_CLIENT'].includes(s.status));
+      if (!dup) {
+        const sc = { id: id('scr'), projectId: p.id, requestedBy: u.id, description: text, analysis: { outOfScope: true, reason: r.text.split('.').slice(0, 2).join('.') + '.', relatedRequirements: [], source: `AI project manager (${r.source})` }, freelancerResponse: null, clientDecision: null, status: 'AWAITING_FREELANCER' as const, createdAt: now() };
+        db().scopeChanges.push(sc);
+        audit({ projectId: p.id, actor: 'client-expectation-agent', actorType: 'agent', action: 'SCOPE_CHANGE_CREATED', details: `Out-of-scope request from a client message, prepared as a change request: "${text.slice(0, 140)}"`, refs: [{ type: 'scope', id: sc.id }] });
+        postMessage({ projectId: p.id, from: 'ai-coordinator', fromType: 'agent', agent: AGENTS.client, audience: 'client', kind: 'notice', text: 'I have opened a change request for this. The freelancer will be asked whether they can take it on and at what price and time; nothing changes until you approve their quote.' });
+        postMessage({ projectId: p.id, from: 'ai-coordinator', fromType: 'agent', agent: AGENTS.freelancer, audience: 'freelancer', kind: 'notice', text: `The client asked for something outside the agreement: "${text.slice(0, 200)}". It does not affect payment for work already agreed. If you want to take it on, quote a price and timeline under Scope changes — or decline.` });
+      }
+    }
   }
   touch(p);
 }));

@@ -26,7 +26,8 @@ function testReportLines(docTexts: Ctx['docTexts']) {
 }
 
 function hasFunctionalEvidence(ctx: Ctx, reqId: string) {
-  if (ctx.kernel.mode === 'KERNEL_LIVE' && ctx.kernel.pages.length) return true;
+  // A real browser (Kernel or local) that actually exercised the page is functional evidence.
+  if ((ctx.kernel.mode === 'KERNEL_LIVE' || ctx.kernel.mode === 'LOCAL_BROWSER') && ctx.kernel.pages.length) return true;
   return testReportLines(ctx.docTexts).some((l) => l.reqId === reqId);
 }
 
@@ -36,8 +37,9 @@ function kernelSignalsFor(req: Requirement, k: KernelRun) {
   const neg: string[] = [];
   const pagesMatching = (re: RegExp) => k.pages.filter((p) => re.test(p.url) || p.headings.some((h) => re.test(h)) || re.test(p.title));
   const any = (key: string) => k.pages.some((p) => !!p.signals[key] && p.signals[key] !== 0);
-  const live = k.mode === 'KERNEL_LIVE';
-  const src = live ? 'Kernel' : 'Demo adapter (static HTML)';
+  const live = k.mode === 'KERNEL_LIVE' || k.mode === 'LOCAL_BROWSER';
+  const src = k.mode === 'KERNEL_LIVE' ? 'Computer agent (Kernel)' : k.mode === 'LOCAL_BROWSER' ? 'Computer agent (local browser)' : 'Demo adapter (static HTML)';
+  const first = k.pages[0]?.signals || {};
   if (/responsive|mobile|homepage|home page/.test(t)) {
     const mobile = k.pages.find((p) => p.viewport.startsWith('mobile'));
     if (mobile) (mobile.signals.horizontalOverflow ? neg : pos).push(`${src}: mobile 375px ${mobile.signals.horizontalOverflow ? 'shows horizontal overflow' : 'renders without horizontal overflow'}`);
@@ -54,12 +56,24 @@ function kernelSignalsFor(req: Requirement, k: KernelRun) {
   if (/search/.test(t)) {
     if (any('searchInput')) pos.push(`${src}: search input present`); else neg.push(`${src}: no search input found`);
     const probe = k.pages.map((p) => p.signals.searchProbe).find(Boolean);
-    if (probe) pos.push(`Kernel search probe: ${probe}`);
+    if (probe) pos.push(`${src}: ${probe}`);
+    const emptyStep = k.steps?.find((s) => /cannot match/.test(s.what));
+    if (emptyStep) (emptyStep.ok ? pos : neg).push(`${src}: ${emptyStep.found}`);
   }
-  if (/filter/.test(t)) (any('filterControls') ? pos : neg).push(`${src}: ${any('filterControls') ? 'filter controls present' : 'no filter controls detected'}`);
+  if (/filter/.test(t)) {
+    (any('filterControls') ? pos : neg).push(`${src}: ${any('filterControls') ? 'filter controls present' : 'no filter controls detected'}`);
+    if (first.filterProbe) {
+      const f = String(first.filterProbe);
+      const m = f.match(/(\d+) → (\d+)/);
+      (m && m[1] !== m[2] ? pos : neg).push(`${src}: changing a filter ${m && m[1] !== m[2] ? 'changed' : 'did not change'} the results (${f})`);
+    }
+  }
   if (/cart|checkout/.test(t)) {
     const c = pagesMatching(/cart|checkout/i);
     (c.length || any('cartLink') ? pos : neg).push(`${src}: ${c.length ? 'cart/checkout page reached' : any('cartLink') ? 'cart control present' : 'no cart or checkout found'}`);
+    if (first.addToCart) (/changed/.test(String(first.addToCart)) ? pos : neg).push(`${src}: clicking "Add to cart" — ${first.addToCart}`);
+    const form = k.pages.find((p) => Number(p.signals.requiredFields) > 0);
+    if (form) pos.push(`${src}: checkout form found with ${form.signals.requiredFields} required fields (not submitted — no order is ever placed)`);
   }
   if (/admin|dashboard/.test(t)) {
     const a = pagesMatching(/admin|dashboard/i);
@@ -109,7 +123,7 @@ function heuristicQA(ctx: Ctx): { results: QAResult[]; domainAgents: QARun['doma
     const key = DOMAIN_AGENTS[r.category] ? r.category : 'frontend';
     byCat.set(key, [...(byCat.get(key) || []), `${r.id} ${r.title}: ${res.status} — ${res.explanation}`]);
   }
-  byCat.set('qa', [`Functional evidence source: ${ctx.kernel.mode === 'KERNEL_LIVE' ? 'Kernel live browser run' : tests.length ? 'freelancer-submitted test report (claims, not independently executed)' : 'none'}`, ...tests.map((x) => `${x.reqId} ${x.status} per ${x.source}`)]);
+  byCat.set('qa', [`Functional evidence source: ${ctx.kernel.mode === 'KERNEL_LIVE' ? 'Kernel live browser run' : ctx.kernel.mode === 'LOCAL_BROWSER' ? 'real browser run on this server (not Kernel)' : tests.length ? 'freelancer-submitted test report (claims, not independently executed)' : 'none'}`, ...tests.map((x) => `${x.reqId} ${x.status} per ${x.source}`)]);
   return {
     results,
     domainAgents: [...byCat.entries()].map(([k, f]) => ({ agent: DOMAIN_AGENTS[k], findings: f })),

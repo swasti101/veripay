@@ -121,15 +121,15 @@ export default function ReviewTriage({ board }: { board: any }) {
   const risky = board.assignments.filter((a: any) => a.quorumAtRisk || a.stalled || a.unanswered);
   return (
     <>
-      <div ref={host} style={{ height: 420 }} className="overflow-hidden rounded-lg border border-slate-200" />
-      <div className="mt-2 flex flex-wrap gap-4 text-xs text-slate-600">
+      <div ref={host} style={{ height: 420 }} className="overflow-hidden rounded-[3px] border border-rule" />
+      <div className="mt-2 flex flex-wrap gap-4 text-xs text-ink-2">
         <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-5 rounded bg-[#2a78d6]" />Voting open</span>
         <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-5 rounded bg-[#1baf7a]" />Vote submitted</span>
         <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-5 rounded b-legend-blocked" />Deadline with no progress</span>
         <span>Click a bar to open that project's expert review.</span>
       </div>
       {risky.length > 0 && (
-        <p className="mt-2 text-xs text-rose-700">
+        <p className="mt-2 text-xs text-refuse">
           {risky.length} assignment(s) have a deadline but no progress — these are what strand money as INCONCLUSIVE.
         </p>
       )}

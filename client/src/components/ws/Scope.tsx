@@ -30,18 +30,18 @@ export default function Scope({ v, reload }: WsProps) {
   return (
     <div className="space-y-4">
       <Section title="Scope-change requests">
-        <p className="mb-3 text-sm text-slate-600">New requests are compared with the approved SOW. Out-of-scope work never counts against existing delivery: the freelancer may price it, the client approves or declines, and the agreement updates only after both approve (as a new version with its own milestone).</p>
+        <p className="mb-3 text-sm text-ink-2">New requests are compared with the approved SOW. Out-of-scope work never counts against existing delivery: the freelancer may price it, the client approves or declines, and the agreement updates only after both approve (as a new version with its own milestone).</p>
         {v.activeAgreement && (
           <div className="mb-4 flex gap-2">
             <input className="input" placeholder="Describe the additional work or change" value={desc} onChange={(e) => setDesc(e.target.value)} />
-            <button className="btn-primary" disabled={a.busy || !desc.trim()} onClick={() => a.run(async () => { await api.post(`/projects/${p.id}/scope-changes`, { description: desc }); setDesc(''); await reload(); })}>Check against SOW</button>
+            <button className="btn-primary shrink-0 whitespace-nowrap" disabled={a.busy || !desc.trim()} onClick={() => a.run(async () => { await api.post(`/projects/${p.id}/scope-changes`, { description: desc }); setDesc(''); await reload(); })}>Check against SOW</button>
           </div>
         )}
         <ErrorNote error={a.error} />
         {v.scopeChanges.length === 0 ? <p className="muted">No scope-change requests.</p> : [...v.scopeChanges].reverse().map((s: any) => (
-          <div key={s.id} className="mb-3 rounded-lg border border-slate-200 p-3 text-sm">
-            <div className="flex flex-wrap items-center gap-2"><Badge>{s.status}</Badge><b>{s.description}</b><span className="ml-auto text-xs text-slate-500">{dt(s.createdAt)} · {v.users[s.requestedBy]?.name}{s.sourceFeedbackId && ' · from client feedback'}</span></div>
-            <div className="mt-1 text-slate-600"><Badge tone={s.analysis.outOfScope ? 'blue' : 'green'}>{s.analysis.outOfScope ? 'OUT OF SCOPE' : 'ALREADY IN SCOPE'}</Badge> {s.analysis.reason} <span className="text-xs text-slate-400">({s.analysis.source})</span></div>
+          <div key={s.id} className="mb-3 rounded-[3px] border border-rule p-3 text-sm">
+            <div className="flex flex-wrap items-center gap-2"><Badge>{s.status}</Badge><b>{s.description}</b><span className="ml-auto text-xs text-ink-3">{dt(s.createdAt)} · {v.users[s.requestedBy]?.name}{s.sourceFeedbackId && ' · from client feedback'}</span></div>
+            <div className="mt-1 text-ink-2"><Badge tone={s.analysis.outOfScope ? 'blue' : 'green'}>{s.analysis.outOfScope ? 'OUT OF SCOPE' : 'ALREADY IN SCOPE'}</Badge> {s.analysis.reason} <span className="text-xs text-ink-3">({s.analysis.source})</span></div>
             {s.freelancerResponse && <div className="mt-1">Freelancer: {s.freelancerResponse.willing ? <>will do it for <b>{money(s.freelancerResponse.cost)}</b> in {s.freelancerResponse.days} days</> : 'declined'} {s.freelancerResponse.note && `— ${s.freelancerResponse.note}`}</div>}
             {s.clientDecision && <div className="mt-1">Client: {s.clientDecision.approved ? `approved → agreement v${s.resultingAgreementVersion}` : 'declined'}</div>}
             {s.status === 'AWAITING_FREELANCER' && party === 'freelancer' && <FreelancerQuote s={s} reload={reload} />}
@@ -55,9 +55,9 @@ export default function Scope({ v, reload }: WsProps) {
         ))}
       </Section>
       <Section title="Disputes, challenges & responses">
-        <p className="mb-3 text-sm text-slate-600">Disputes about existing delivery follow the agreed process: both parties explain, the SOW and approved changes are checked, QA runs, missing evidence is requested, and expert review is triggered if ambiguity remains.</p>
+        <p className="mb-3 text-sm text-ink-2">Disputes about existing delivery follow the agreed process: both parties explain, the SOW and approved changes are checked, QA runs, missing evidence is requested, and expert review is triggered if ambiguity remains.</p>
         {challenges.length === 0 ? <p className="muted">No challenges raised.</p> : (
-          <ul className="space-y-2">{challenges.map((m: any) => <li key={m.id} className="rounded-lg bg-slate-50 p-2 text-sm"><div className="text-xs text-slate-500"><b>{v.users[m.from]?.name}</b> · {dt(m.createdAt)} · <Badge>{m.kind.toUpperCase()}</Badge></div>{m.text}</li>)}</ul>
+          <ul className="space-y-2">{challenges.map((m: any) => <li key={m.id} className="rounded-[3px] bg-paper p-2 text-sm"><div className="text-xs text-ink-3"><b>{v.users[m.from]?.name}</b> · {dt(m.createdAt)} · <Badge>{m.kind.toUpperCase()}</Badge></div>{m.text}</li>)}</ul>
         )}
       </Section>
     </div>
