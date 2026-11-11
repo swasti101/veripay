@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api, money, dt } from '../../api';
 import { Badge, ErrorNote, Section, SimTag, Spinner, useAction } from '../ui';
 import Grid, { badgeCell, moneyCell } from '../Grid';
@@ -16,6 +17,100 @@ function issuesOf(v: any): string[] {
   for (const r of v.requirements) if (!v.milestones.some((m: any) => m.id === r.milestoneId)) out.push(`${r.id} is not linked to a milestone.`);
   if (!v.fundingPlan) out.push('The client must choose a funding plan (Funding tab).');
   return out;
+}
+
+/** What has to happen before this version can be signed — in order, with the next step
+ *  doable right here, so "Pending / Pending" never leaves anyone guessing. */
+function SigningChecklist({ v, draft, issues, reload }: { v: any; draft: any; issues: string[]; reload: () => Promise<void> }) {
+  const p = v.project, party = v.party;
+  const other: 'client' | 'freelancer' = party === 'client' ? 'freelancer' : 'client';
+  const otherJoined = !!p[other === 'client' ? 'clientId' : 'freelancerId'];
+  const clean = (n?: string) => (n || '').replace(/ \((DEMO|SIMULATED)[^)]*\)/, '');
+  const name = (role: 'client' | 'freelancer') => clean(v.users[role === 'client' ? p.clientId : p.freelancerId]?.name);
+  const [email, setEmail] = useState('');
+  const [copied, setCopied] = useState(false);
+  const a = useAction();
+  const link = p.invite?.status === 'PENDING' ? `${location.origin}/join/${p.invite.code}` : '';
+  const termIssues = issues.filter((i) => !/funding plan/i.test(i));
+
+  type Step = { done: boolean; title: string; body: React.ReactNode };
+  const steps: Step[] = [
+    {
+      done: otherJoined,
+      title: otherJoined ? `${name(other)} has joined as the ${other}` : `Invite the ${other}`,
+      body: otherJoined ? null : p.invite?.status === 'PENDING' ? (
+        <div className="space-y-2">
+          <p>Send this link or code to the {other}{p.invite.email ? ` (${p.invite.email})` : ''}. They sign in or create a {other} account, then join.</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-[3px] border border-rule bg-surface px-2.5 py-1 font-semibold tracking-[0.15em] text-ink tabular-nums">{p.invite.code}</span>
+            <span className="mono max-w-full truncate text-ink-2">{link}</span>
+            <button className="btn-secondary" onClick={() => { navigator.clipboard.writeText(link); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>{copied ? 'Copied' : 'Copy link'}</button>
+          </div>
+          {p.isDemo || v.users[p.createdBy]?.isDemo ? (
+            <p className="text-ink-3">Demo: sign out, choose <b className="font-medium">Demo → {other === 'client' ? 'Jamie Chen' : 'Sam Okafor'}</b>, then paste the code into <b className="font-medium">Join</b> on the projects page.</p>
+          ) : null}
+        </div>
+      ) : (
+        <form className="flex flex-wrap gap-2" onSubmit={(e) => { e.preventDefault(); a.run(async () => { await api.post(`/projects/${p.id}/invite`, { email }); await reload(); }); }}>
+          <input className="input max-w-xs" type="email" placeholder={`${other}@company.com (optional)`} value={email} onChange={(e) => setEmail(e.target.value)} />
+          <button className="btn-primary">Create invite link</button>
+        </form>
+      ),
+    },
+    {
+      done: !!draft.fundingPlan,
+      title: draft.fundingPlan ? `Funding plan chosen: ${draft.fundingPlan.option.toLowerCase()}` : 'The client chooses how to fund it',
+      body: draft.fundingPlan ? null : party === 'client'
+        ? <p>Pick advance, partial or full funding on the <Link to="../funding" relative="path" className="text-seal underline">Funding</Link> page. The freelancer accepts it by approving.</p>
+        : <p>Only the client can choose this{otherJoined ? '' : ', so it waits until they join'}. You will both see it here once they do.</p>,
+    },
+    {
+      done: termIssues.length === 0,
+      title: termIssues.length ? 'Fix the terms' : 'Amounts and milestones add up',
+      body: termIssues.length ? <ul className="space-y-0.5">{termIssues.map((i) => <li key={i}>{i}</li>)}</ul> : null,
+    },
+    {
+      done: !!draft.approvals.client && !!draft.approvals.freelancer,
+      title: 'Both sides approve',
+      body: (
+        <div className="flex flex-wrap gap-x-5 gap-y-1">
+          {(['client', 'freelancer'] as const).map((r) => {
+            const joined = !!p[r === 'client' ? 'clientId' : 'freelancerId'];
+            const signed = draft.approvals[r];
+            return (
+              <span key={r} className="flex items-center gap-1.5">
+                <span className={`inline-block h-1.5 w-1.5 rounded-full ${signed ? 'bg-released' : joined ? 'bg-hold' : 'bg-rule-strong'}`} />
+                <span className="text-ink">{r === party ? 'You' : name(r) || `The ${r}`}</span>
+                <span className="text-ink-3">{signed ? `approved ${dt(signed)}` : joined ? 'not approved yet' : 'has not joined'}</span>
+              </span>
+            );
+          })}
+        </div>
+      ),
+    },
+  ];
+  const firstOpen = steps.findIndex((s) => !s.done);
+
+  return (
+    <div className="rounded-[3px] border border-rule">
+      <div className="border-b border-rule bg-paper px-4 py-2 text-[12px] text-ink-2">Before this version can be signed</div>
+      <ol className="divide-y divide-rule">
+        {steps.map((s, i) => (
+          <li key={i} className={`flex gap-3 px-4 py-3 ${i === firstOpen ? 'bg-seal-wash/40' : ''}`}>
+            <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-semibold tabular-nums ${s.done ? 'bg-released text-white' : i === firstOpen ? 'bg-seal text-white' : 'border border-rule-strong text-ink-3'}`}>
+              {s.done ? '✓' : i + 1}
+            </span>
+            <div className="min-w-0 flex-1 text-[13px]">
+              <div className={`${s.done ? 'text-ink-2' : 'font-medium text-ink'}`}>{s.title}</div>
+              {!s.done && s.body && <div className="mt-1.5 text-ink-2">{s.body}</div>}
+              {s.done && i === 3 && s.body}
+            </div>
+          </li>
+        ))}
+      </ol>
+      {a.error && <div className="px-4 pb-3"><ErrorNote error={a.error} /></div>}
+    </div>
+  );
 }
 
 export default function Agreement({ v, reload }: WsProps) {
@@ -42,7 +137,6 @@ export default function Agreement({ v, reload }: WsProps) {
     <div className="space-y-4">
       <Section title={<span className="flex items-center gap-2">Agreement v{shown.version} <Badge>{shown.status}</Badge></span>}
         actions={<>
-          {draft && <span className="text-sm text-ink-2">Client: {draft.approvals.client ? <Badge tone="green">approved</Badge> : <Badge>pending</Badge>} Freelancer: {draft.approvals.freelancer ? <Badge tone="green">approved</Badge> : <Badge>pending</Badge>}</span>}
           {draft && dirty && <button className="btn-secondary" disabled={a.busy} onClick={() => { setDirty(false); }}>Discard</button>}
           {draft && dirty && <button className="btn-primary" disabled={a.busy} onClick={save}>Save changes</button>}
           {draft && !dirty && !draft.approvals[party] && <button className="btn-success" disabled={a.busy || issues.length > 0 || !p.clientId || !p.freelancerId} onClick={() => a.run(async () => { await api.post(`/projects/${p.id}/agreement/approve`); await reload(); })}>Approve v{draft.version}</button>}
@@ -61,8 +155,7 @@ export default function Agreement({ v, reload }: WsProps) {
               <button className="btn-secondary" disabled={a.busy || !summary.trim()} onClick={() => a.run(async () => { await api.post(`/projects/${p.id}/agreement/propose-change`, { changeSummary: summary }); setSummary(''); await reload(); })}>Propose change (new version)</button>
             </div>
           )}
-          {(!p.clientId || !p.freelancerId) && <p className="text-hold">Both parties must join before the agreement can be approved.</p>}
-          {draft && issues.map((i) => <div key={i} className="text-refuse">• {i}</div>)}
+          {draft && <SigningChecklist v={v} draft={draft} issues={issues} reload={reload} />}
           {unclear.length > 0 && <div className="text-panel">• {unclear.map((r: any) => r.id).join(', ')} have unmeasurable wording without a clarification. They can be approved, but QA will mark them NEEDS_CLARIFICATION and may escalate to experts.</div>}
           <ErrorNote error={a.error} />
           {a.busy && <Spinner />}

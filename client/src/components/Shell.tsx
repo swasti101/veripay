@@ -122,7 +122,7 @@ export default function Shell({ children, projectId }: { children: ReactNode; pr
 
           {/* Who you are, and what is actually wired. */}
           <div className="border-t border-rule px-4 py-3 lg:sticky lg:bottom-0 lg:bg-surface">
-            <SideSwitch />
+            <SideSwitch projectId={projectId} />
             {config && <Providers config={config} />}
             <div className="mt-2.5 flex items-center justify-between gap-2">
               <div className="min-w-0">
@@ -150,15 +150,26 @@ export default function Shell({ children, projectId }: { children: ReactNode; pr
 
 /** Demo only: hop between the client, freelancer and expert without leaving the page,
  *  so a walkthrough can show both sides of the same moment. */
-function SideSwitch() {
+function SideSwitch({ projectId }: { projectId?: string }) {
   const { user, refreshUser } = useApp();
   const nav = useNavigate();
   const loc = useLocation();
   const [demo, setDemo] = useState<any[]>([]);
+  const [parties, setParties] = useState<{ client?: string | null; freelancer?: string | null }>({});
   const [busy, setBusy] = useState(false);
   useEffect(() => { api.get('/auth/demo-users').then(setDemo).catch(() => {}); }, []);
+  // On a project page, "view as client" should become THIS project's client, not a default one
+  // who may not be a party to it.
+  useEffect(() => {
+    if (!projectId) { setParties({}); return; }
+    api.get(`/projects/${projectId}`).then((r) => setParties({ client: r.project.clientId, freelancer: r.project.freelancerId })).catch(() => setParties({}));
+  }, [projectId, user.id]);
   if (!user.isDemo || demo.length === 0) return null;
-  const pick = (role: string) => demo.find((u) => u.role === role && !/no projects/i.test(u.name));
+  const pick = (role: string) => {
+    const onProject = parties[role as 'client' | 'freelancer'];
+    const match = onProject && demo.find((u) => u.id === onProject);
+    return match || demo.find((u) => u.role === role && !/no projects/i.test(u.name));
+  };
   const sides = [['client', 'Client'], ['freelancer', 'Freelancer'], ['expert', 'Expert']] as const;
   const go = async (role: string) => {
     const u = pick(role);
