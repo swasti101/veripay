@@ -156,7 +156,8 @@ export interface MilestoneState {
   workStatus: WorkStatus;
   authorized: number;
   captured: number;
-  paid: number;
+  paid: number;        // net disbursed to the freelancer (gross minus platform fee)
+  platformFee: number; // retained by the platform; paid + platformFee settles the gross
   underReview: number;
   authorizationId?: string;
   authorizationExpires?: string;
@@ -178,7 +179,7 @@ export interface Project {
   activeAgreementId: string | null; // last APPROVED version
   draftAgreementId: string | null; // version being negotiated
   milestoneStates: MilestoneState[];
-  advance: { status: FundingStatus; amount: number; paid: number };
+  advance: { status: FundingStatus; amount: number; paid: number; platformFee: number };
   isDemo: boolean;
   demoLabel?: string;
   createdAt: string;

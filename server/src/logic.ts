@@ -68,9 +68,10 @@ export function finalizeIfApproved(p: Project, v: AgreementVersion, actor: User)
   p.activeAgreementId = v.id;
   p.draftAgreementId = null;
   p.status = 'ACTIVE';
-  p.advance = { status: p.advance?.paid >= v.advanceAmount && v.advanceAmount > 0 ? 'PAID' : v.advanceAmount > 0 ? (p.advance?.status && p.advance.status !== 'FUNDING_REQUIRED' ? p.advance.status : 'FUNDING_REQUIRED') : 'PAID', amount: v.advanceAmount, paid: p.advance?.paid || 0 };
+  const advSettled = (p.advance?.paid || 0) + (p.advance?.platformFee || 0);
+  p.advance = { status: advSettled >= v.advanceAmount && v.advanceAmount > 0 ? 'PAID' : v.advanceAmount > 0 ? (p.advance?.status && p.advance.status !== 'FUNDING_REQUIRED' ? p.advance.status : 'FUNDING_REQUIRED') : 'PAID', amount: v.advanceAmount, paid: p.advance?.paid || 0, platformFee: p.advance?.platformFee || 0 };
   for (const m of v.milestones) if (!p.milestoneStates.some((s) => s.milestoneId === m.id))
-    p.milestoneStates.push({ milestoneId: m.id, fundingStatus: 'FUNDING_REQUIRED', workStatus: 'NOT_STARTED', authorized: 0, captured: 0, paid: 0, underReview: 0 });
+    p.milestoneStates.push({ milestoneId: m.id, fundingStatus: 'FUNDING_REQUIRED', workStatus: 'NOT_STARTED', authorized: 0, captured: 0, paid: 0, platformFee: 0, underReview: 0 });
   for (const r of v.requirements) r.status = r.status || 'UNVERIFIED';
   audit({ projectId: p.id, actor: actor.id, actorType: 'user', action: 'AGREEMENT_APPROVED', details: `Agreement v${v.version} approved by both parties and locked as the payment baseline. ${v.changeSummary}`, refs: [{ type: 'agreement', id: v.id }] });
   return true;
@@ -78,8 +79,11 @@ export function finalizeIfApproved(p: Project, v: AgreementVersion, actor: User)
 
 export function refreshFunding(st: MilestoneState, amount: number, pendingReview: boolean) {
   let s: FundingStatus;
-  if (st.paid >= amount && amount > 0) s = 'PAID';
-  else if (st.captured > st.paid) s = 'AWAITING_DISBURSEMENT';
+  // The platform fee is retained revenue, not an unpaid remainder: a milestone is settled when
+  // the net paid out plus the fee withheld covers the agreed gross.
+  const settled = st.paid + (st.platformFee || 0);
+  if (settled >= amount - 0.005 && amount > 0) s = 'PAID';
+  else if (st.captured > settled + 0.005) s = 'AWAITING_DISBURSEMENT';
   else if (st.paid > 0) s = pendingReview ? 'DISPUTED' : 'PARTIALLY_PAID';
   else if (pendingReview && st.authorized > 0) s = 'DISPUTED';
   else if (st.authorized > 0) s = 'AUTHORIZED';
@@ -115,6 +119,7 @@ export function moneySummary(p: Project) {
     authorized: authorizedNow, captured: capturedMs + advCaptured, awaitingFunding: Math.max(0, (ag?.budget || 0) - funded - 0),
     eligible, paid, underReview,
     expertFees: txs.filter((t) => t.type === 'EXPERT_FEE_PAYOUT' && ok(t)).reduce((a, t) => a + t.amount, 0),
+    platformFees: txs.filter((t) => t.type === 'PLATFORM_FEE' && ok(t)).reduce((a, t) => a + t.amount, 0),
     simulated: txs.some((t) => t.mode === 'SIMULATED'),
   };
 }

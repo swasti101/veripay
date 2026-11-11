@@ -108,8 +108,8 @@ export async function seed(force = false) {
       id: id('prj'), title, description, category: 'website', createdBy: client.id, initiatorRole: 'client', clientId: client.id, freelancerId: free.id,
       invite: { code: Math.random().toString(16).slice(2, 12).toUpperCase(), role: 'freelancer', email: free.email, status: 'ACCEPTED' },
       status: 'ACTIVE', agreementVersions: [ag], activeAgreementId: ag.id, draftAgreementId: null,
-      milestoneStates: ag.milestones.map((m) => ({ milestoneId: m.id, fundingStatus: 'FUNDING_REQUIRED', workStatus: 'NOT_STARTED', authorized: 0, captured: 0, paid: 0, underReview: 0 })),
-      advance: { status: ag.advanceAmount ? 'PAID' : 'PAID', amount: ag.advanceAmount, paid: ag.advanceAmount }, isDemo: true, createdAt: ag.createdAt, updatedAt: T, ...extra,
+      milestoneStates: ag.milestones.map((m) => ({ milestoneId: m.id, fundingStatus: 'FUNDING_REQUIRED', workStatus: 'NOT_STARTED', authorized: 0, captured: 0, paid: 0, platformFee: 0, underReview: 0 })),
+      advance: { status: 'PAID', amount: ag.advanceAmount, paid: ag.advanceAmount, platformFee: 0 }, isDemo: true, createdAt: ag.createdAt, updatedAt: T, ...extra,
     };
     d.projects.push(p);
     return p;

@@ -28,6 +28,15 @@ const str = (v: any, max = 5000) => (typeof v === 'string' ? v.trim().slice(0, m
 const num = (v: any) => (typeof v === 'number' && isFinite(v) ? Math.round(v * 100) / 100 : Number.isFinite(Number(v)) ? Math.round(Number(v) * 100) / 100 : NaN);
 const U = (req: Request) => req.user!;
 
+/** Operator-readable PayPal failure, keeping the debug_id PayPal support asks for. */
+function ppFail(e: unknown) {
+  if (e instanceof pp.PayPalCallError) {
+    return [e.message, e.debugId ? `PayPal debug_id ${e.debugId} — quote this to PayPal support.` : null,
+      e.retryable ? 'This looks transient; retrying is safe.' : 'This is not a transient failure; retrying as-is will fail again.'].filter(Boolean).join(' ');
+  }
+  return e instanceof Error ? e.message : String(e);
+}
+
 function tx(t: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt' | 'currency'> & { currency?: string }) {
   const rec: Transaction = { id: id('tx'), currency: 'USD', createdAt: now(), updatedAt: now(), ...t } as Transaction;
   db().transactions.push(rec);
@@ -237,7 +246,7 @@ api.post('/projects', requireVerifiedEmail, h(async (req) => {
     id: id('prj'), title, description, category, createdBy: u.id, initiatorRole: role,
     clientId: role === 'client' ? u.id : null, freelancerId: role === 'freelancer' ? u.id : null, invite: null,
     status: 'DRAFT', agreementVersions: [], activeAgreementId: null, draftAgreementId: null, milestoneStates: [],
-    advance: { status: 'FUNDING_REQUIRED', amount: 0, paid: 0 }, isDemo: false, createdAt: now(), updatedAt: now(),
+    advance: { status: 'FUNDING_REQUIRED', amount: 0, paid: 0, platformFee: 0 }, isDemo: false, createdAt: now(), updatedAt: now(),
   };
   db().projects.push(p);
   audit({ projectId: p.id, actor: u.id, actorType: 'user', action: 'PROJECT_CREATED', details: `${role}-initiated project "${title}"`, refs: [] });
@@ -438,7 +447,7 @@ api.post('/projects/:id/fund/confirm', h(async (req) => {
     if (t.mid && !t.review) msState(p, t.mid).fundingStatus = 'PAYMENT_FAILED';
     if (target === 'ADVANCE') p.advance.status = 'PAYMENT_FAILED';
     touch(p);
-    fail(502, `PayPal did not confirm the payment: ${e.message}`);
+    fail(502, `PayPal did not confirm the payment. ${ppFail(e)}`);
   }
   r = r!;
   if (!r.verified) {
@@ -480,7 +489,16 @@ async function payoutTo(p: Project, mid: string | null, source: Transaction | nu
   const net = Math.round((gross - feeAmount) * 100) / 100;
   const apply = (paidAmt: number) => {
     if (who !== 'freelancer') return;
-    if (mid) { const st = msState(p, mid); st.paid += paidAmt; } else { p.advance.paid += paidAmt; p.advance.status = p.advance.paid >= p.advance.amount ? 'PAID' : 'PARTIALLY_PAID'; }
+    if (mid) {
+      const st = msState(p, mid);
+      st.paid += paidAmt;
+      st.platformFee = (st.platformFee || 0) + feeAmount;
+    } else {
+      p.advance.paid += paidAmt;
+      p.advance.platformFee = (p.advance.platformFee || 0) + feeAmount;
+      // The fee is retained revenue, not an unpaid remainder — settle against paid + fee.
+      p.advance.status = p.advance.paid + p.advance.platformFee >= p.advance.amount - 0.005 ? 'PAID' : 'PARTIALLY_PAID';
+    }
   };
   if (!receiver.paypalEmail && mode !== 'SIMULATED') {
     if (!mid) p.advance.status = 'AWAITING_DISBURSEMENT';
@@ -497,7 +515,7 @@ async function payoutTo(p: Project, mid: string | null, source: Transaction | nu
     return rec;
   } catch (e: any) {
     if (!mid && who === 'freelancer') p.advance.status = 'AWAITING_DISBURSEMENT';
-    return tx({ projectId: p.id, milestoneId: mid, type: type as any, amount: net, status: 'PAYMENT_FAILED', mode, paypal: {}, payee: receiver.id, initiatedBy: actor.id, allocationId, note: `Payout failed: ${e.message}. Captured funds remain with the platform PayPal account; retry from the Payments tab.` });
+    return tx({ projectId: p.id, milestoneId: mid, type: type as any, amount: net, status: 'PAYMENT_FAILED', mode, paypal: {}, payee: receiver.id, initiatedBy: actor.id, allocationId, note: `Payout failed: ${ppFail(e)} Captured funds remain with the platform PayPal account; retry from the Payments tab.` });
   }
 }
 
@@ -914,12 +932,17 @@ api.post('/allocations/:aid/execute', h(async (req) => {
   const remainingAfter = st.authorized - a.eligibleAmount;
   let cap;
   try { cap = await pp.captureAuthorization(st.authorizationId!, a.eligibleAmount, remainingAfter <= 0, `${a.id}`); }
-  catch (e: any) { tx({ projectId: p.id, milestoneId: ms.id, type: 'MILESTONE_CAPTURE', amount: a.eligibleAmount, status: 'PAYMENT_FAILED', mode: pp.paypalMode(), paypal: { authorizationId: st.authorizationId }, initiatedBy: u.id, allocationId: a.id, note: e.message }); st.fundingStatus = 'PAYMENT_FAILED'; touch(p); fail(502, `Capture failed: ${e.message}`); }
+  catch (e: unknown) {
+    const detail = ppFail(e);
+    tx({ projectId: p.id, milestoneId: ms.id, type: 'MILESTONE_CAPTURE', amount: a.eligibleAmount, status: 'PAYMENT_FAILED', mode: pp.paypalMode(), paypal: { authorizationId: st.authorizationId }, initiatedBy: u.id, allocationId: a.id, note: detail });
+    st.fundingStatus = 'PAYMENT_FAILED'; touch(p);
+    fail(502, `Capture failed. ${detail}`);
+  }
   const capRec = tx({ projectId: p.id, milestoneId: ms.id, type: 'MILESTONE_CAPTURE', amount: a.eligibleAmount, status: cap!.status, mode: cap!.mode, paypal: { authorizationId: st.authorizationId, captureId: cap!.captureId }, initiatedBy: u.id, approvals: [a.approvals.client!, a.approvals.freelancer!], allocationId: a.id, note: `${a.releaseType} per allocation ${a.id}${remainingAfter > 0 ? `; $${remainingAfter} remains authorized (under review)` : ''}` });
   st.authorized = remainingAfter; st.captured += a.eligibleAmount;
   a.status = 'EXECUTED';
   await payoutTo(p, ms.id, capRec, 'freelancer', a.eligibleAmount, `${a.releaseType.replace('_', ' ')} — ${ms.id} ${ms.title}`, u, a.id);
-  if (st.captured >= ms.amount) st.workStatus = 'ACCEPTED';
+  if (st.captured >= ms.amount - 0.005) st.workStatus = 'ACCEPTED';
   refreshFunding(st, ms.amount, remainingAfter > 0 && a.disputedAmount > 0);
   if (p.milestoneStates.every((s) => s.workStatus === 'ACCEPTED' || s.workStatus === 'CLOSED')) p.status = 'COMPLETED';
   touch(p);
@@ -1069,6 +1092,7 @@ export async function paypalWebhook(req: Request, res: Response) {
       t.status = 'SUCCESS';
       const p = db().projects.find((x) => x.id === t.projectId)!;
       if (t.type === 'FREELANCER_PAYOUT') { if (t.milestoneId) msState(p, t.milestoneId).paid += t.amount; else p.advance.paid += t.amount; }
+      // Note: the matching PLATFORM_FEE row already recorded the withheld amount at release time.
     }
     save();
   }

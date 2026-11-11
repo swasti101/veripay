@@ -84,3 +84,7 @@ approval; this build onboards payees by PayPal email for Payouts, which must be 
 
 ## See also
 - [DEMO.md](./DEMO.md) — hackathon showcase script and the full sponsor-key checklist.
+- [APIMATIC.md](./APIMATIC.md) — APIMatic **Context Plugin** usage: the plugin is installed
+  project-scoped (`.claude/settings.json`) and was used to find and fix three real defects in our
+  PayPal integration (no request timeout, retries misconfigured for writes, and PayPal's `debug_id`
+  being discarded on failure).
