@@ -54,7 +54,7 @@ export default function Login() {
           <div>
             <h1 className="max-w-2xl text-[34px] leading-[1.15] font-semibold text-ink" style={{ fontFamily: 'var(--font-display)' }}>
               Freelance payments decided by the contract, the evidence, and an independent
-              panel — not by whoever argues hardest.
+              panel.
             </h1>
             <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-ink-2">
               Agree a Statement of Work, fund milestones through PayPal, submit the work with evidence.
