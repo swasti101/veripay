@@ -1,7 +1,14 @@
 import express from 'express';
 import path from 'node:path';
 import fs from 'node:fs';
+import net from 'node:net';
 import { fileURLToPath } from 'node:url';
+
+// Some hosts (Kernel's per-browser endpoints among them) publish an IPv6 address that many
+// networks cannot route. Node's default 250 ms happy-eyeballs window gives up on IPv6 and then
+// times out instead of falling back cleanly; a longer window makes the IPv4 fallback reliable
+// while still using IPv6 where it works. curl was unaffected, which is what masked this.
+net.setDefaultAutoSelectFamilyAttemptTimeout(2500);
 import { api, evidenceHandler, paypalWebhook, errorHandler } from './routes.js';
 import { seed } from './seed.js';
 

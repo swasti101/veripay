@@ -8,7 +8,9 @@ export type ProviderName = 'anthropic' | 'gemini' | 'groq';
 
 // Groq is OpenAI-compatible. Its text models have no image input, so when a call carries
 // screenshots we switch to a vision-capable Groq model for that call only.
-const GROQ_TEXT_DEFAULT = 'llama-3.3-70b-versatile';
+// Verified against GET /openai/v1/models on a free-tier key: llama-3.3-70b-versatile is not
+// available there, gpt-oss-120b is. Override with GROQ_MODEL if your account differs.
+const GROQ_TEXT_DEFAULT = 'openai/gpt-oss-120b';
 const GROQ_VISION_DEFAULT = 'qwen/qwen3.8-27b';
 
 /** Which provider answers. AI_PROVIDER pins one explicitly; otherwise first key present wins. */
@@ -66,7 +68,12 @@ export async function aiJSON<T = any>(system: string, user: string, images: Imag
         body: JSON.stringify({
           model: p.model,
           max_completion_tokens: maxTokens,
-          response_format: { type: 'json_object' },
+          // Groq's strict JSON validator rejects valid-looking output from the vision model,
+          // so JSON mode is only requested for text calls; vision output is parsed below.
+          ...(images.length ? {} : { response_format: { type: 'json_object' } }),
+          // gpt-oss models spend completion tokens on reasoning; keep that bounded so a long
+          // QA prompt still leaves room for the answer.
+          ...(/gpt-oss/.test(p.model) ? { reasoning_effort: 'low' } : {}),
           messages: [{ role: 'system', content: system }, { role: 'user', content: images.length ? content : instruction }],
         }),
       });
