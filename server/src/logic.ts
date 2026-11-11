@@ -124,10 +124,45 @@ export function moneySummary(p: Project) {
   };
 }
 
+/* ── Pre-check ──────────────────────────────────────────────────────────────
+   A revision with too much left unfinished goes back to the freelancer before the client
+   is asked to review it. "Unfinished" means something the freelancer can act on (FAIL,
+   UNVERIFIED, PARTIAL). NEEDS_CLARIFICATION is excluded: it is waiting on the client's
+   answer, so it must never hold the freelancer's work back. */
+export const PRECHECK_MAX_UNFINISHED = () => {
+  const v = Number(process.env.PRECHECK_MAX_UNFINISHED);
+  return Number.isFinite(v) && v >= 0 && v <= 1 ? v : 0.5;
+};
+
+export function evaluatePrecheck(results: { requirementId: string; status: string }[]): NonNullable<import('./types.js').Submission['precheck']> {
+  const unfinished = results.filter((r) => ['FAIL', 'UNVERIFIED', 'PARTIAL'].includes(r.status)).map((r) => r.requirementId);
+  const awaitingClient = results.filter((r) => r.status === 'NEEDS_CLARIFICATION').map((r) => r.requirementId);
+  const considered = results.filter((r) => !['OUT_OF_SCOPE', 'NEEDS_CLARIFICATION'].includes(r.status)).length;
+  const threshold = PRECHECK_MAX_UNFINISHED();
+  // Nothing the freelancer can act on (all clarifications or out of scope) → the client must look.
+  const passed = considered === 0 || unfinished.length / considered <= threshold;
+  return { passed, unfinished, awaitingClient, considered, threshold, at: now() };
+}
+
+/** True while a revision sits with the freelancer and has not been sent on to the client. */
+export const withFreelancer = (s?: { precheck?: { passed: boolean; sentAnywayAt?: string } } | null) =>
+  !!s?.precheck && !s.precheck.passed && !s.precheck.sentAnywayAt;
+
+export function latestSubmission(projectId: string, milestoneId: string) {
+  return db().submissions.filter((s) => s.projectId === projectId && s.milestoneId === milestoneId).at(-1) || null;
+}
+
 /** Project as seen by one party. Expert votes stay sealed until the review closes. */
 export function projectView(p: Project, u: User) {
   const d = db();
   const party = partyOf(p, u)!;
+  // A revision returned by the pre-check is the freelancer's working draft: the client sees
+  // that it exists and went back, not the findings — those reach them once it is sent on.
+  const heldSubs = new Set(d.submissions.filter((s) => s.projectId === p.id && withFreelancer(s)).map((s) => s.id));
+  const visibleQa = d.qaRuns.filter((q) => q.projectId === p.id).map((q) =>
+    party === 'client' && heldSubs.has(q.submissionId)
+      ? { id: q.id, projectId: q.projectId, milestoneId: q.milestoneId, submissionId: q.submissionId, createdAt: q.createdAt, status: q.status, heldForFreelancer: true }
+      : q);
   const userMap = Object.fromEntries(d.users.map((x) => [x.id, { id: x.id, name: x.name, role: x.role, isDemo: x.isDemo, payoutOnboarded: !!x.payoutOnboarded }]));
   const reviews = d.expertReviews.filter((r) => r.projectId === p.id).map((r) => {
     const sealed = r.status === 'VOTING' || r.status === 'AWAITING_FEE_ACK';
@@ -137,7 +172,7 @@ export function projectView(p: Project, u: User) {
     project: p, party,
     activeAgreement: activeAgreement(p), draftAgreement: draftAgreement(p),
     submissions: d.submissions.filter((s) => s.projectId === p.id),
-    qaRuns: d.qaRuns.filter((q) => q.projectId === p.id),
+    qaRuns: visibleQa,
     feedback: d.feedback.filter((f) => f.projectId === p.id),
     reviews,
     experts: d.experts.map((e) => ({ ...e, name: d.users.find((x) => x.id === e.userId)?.name, conflicts: undefined, hasConflictWithParty: e.conflicts.includes(p.clientId || '') || e.conflicts.includes(p.freelancerId || '') })),
@@ -197,11 +232,12 @@ export function pendingActions(p: Project, party: Party): { action: string; tab:
     if (party === 'client' && funded < ms.amount && st.workStatus === 'NOT_STARTED' && (committed || isNext))
       out.push({ action: `Fund ${ms.id} ($${ms.amount - funded})${committed ? '' : ' — next milestone, not yet funded'}`, tab: 'funding' });
     if (party === 'freelancer' && st.workStatus === 'NOT_STARTED' && funded > 0) out.push({ action: `Start funded milestone ${ms.id}`, tab: 'delivery' });
-    if (party === 'freelancer' && ['IN_PROGRESS', 'REVISION_REQUESTED'].includes(st.workStatus)) out.push({ action: `Submit deliverables for ${ms.id}`, tab: 'delivery' });
-
     const lastSub = d.submissions.filter((s) => s.projectId === p.id && s.milestoneId === ms.id).at(-1);
+    const held = withFreelancer(lastSub);
+    if (party === 'freelancer' && held) out.push({ action: `${ms.id} came back from the pre-check — finish ${lastSub!.precheck!.unfinished.join(', ')} and resubmit`, tab: 'delivery' });
+    else if (party === 'freelancer' && ['IN_PROGRESS', 'REVISION_REQUESTED'].includes(st.workStatus)) out.push({ action: `Submit deliverables for ${ms.id}`, tab: 'delivery' });
     const lastFb = d.feedback.filter((f) => f.projectId === p.id && f.milestoneId === ms.id).at(-1);
-    if (party === 'client' && lastSub && ['QA_COMPLETE', 'SUBMITTED'].includes(st.workStatus) && (!lastFb || lastFb.createdAt < lastSub.createdAt))
+    if (party === 'client' && lastSub && !held && ['QA_COMPLETE', 'SUBMITTED'].includes(st.workStatus) && (!lastFb || lastFb.createdAt < lastSub.createdAt))
       out.push({ action: `Give satisfaction feedback on ${ms.id}`, tab: 'feedback' });
 
     const rv = d.expertReviews.filter((r) => r.projectId === p.id && r.milestoneId === ms.id).at(-1);

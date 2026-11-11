@@ -37,7 +37,8 @@ function stageState(v: any, mid: string): Record<string, 'done' | 'now' | 'todo'
   const done = {
     funded: !!st && st.authorized + st.captured > 0,
     submitted: !!sub,
-    verified: !!qa,
+    // A revision returned by the pre-check is not "verified" — it went back for more work.
+    verified: !!qa && !(sub?.precheck && !sub.precheck.passed && !sub.precheck.sentAnywayAt),
     reviewed: !!fb,
     decided: !!al,
     paid: !!st && st.fundingStatus === 'PAID',

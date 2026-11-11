@@ -4,13 +4,17 @@ import { useApp } from '../App';
 import { ErrorNote, Modal, SimTag, Spinner } from './ui';
 
 let loadedIntent: string | null = null;
-function loadSdk(clientId: string, intent: 'authorize' | 'capture'): Promise<any> {
+function loadSdk(clientId: string, intent: 'authorize' | 'capture', sandbox: boolean): Promise<any> {
   if ((window as any).paypal && loadedIntent === intent) return Promise.resolve((window as any).paypal);
   document.querySelectorAll('script[data-paypal-sdk]').forEach((s) => s.remove());
   delete (window as any).paypal;
   return new Promise((res, rej) => {
     const s = document.createElement('script');
-    s.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=USD&intent=${intent}&components=buttons`;
+    // In sandbox the guest card form rejects almost every card (and any non-US billing country),
+    // which derails a demo. Paying by logging in with a sandbox personal account is reliable,
+    // so the card button is hidden in sandbox only. Live checkout keeps every funding source.
+    const funding = sandbox ? '&disable-funding=card,credit,paylater' : '';
+    s.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=USD&intent=${intent}&components=buttons${funding}`;
     s.dataset.paypalSdk = '1';
     s.onload = () => { loadedIntent = intent; res((window as any).paypal); };
     s.onerror = () => rej(new Error('Could not load the PayPal JS SDK'));
@@ -32,7 +36,7 @@ export default function PayPalCheckout({ projectId, target, amount, label, inten
   useEffect(() => {
     if (!open || simulated || !config?.paypal.clientId) return;
     let cancelled = false;
-    loadSdk(config.paypal.clientId, intent === 'AUTHORIZE' ? 'authorize' : 'capture').then((paypal) => {
+    loadSdk(config.paypal.clientId, intent === 'AUTHORIZE' ? 'authorize' : 'capture', config.paypal.mode === 'PAYPAL_SANDBOX').then((paypal) => {
       if (cancelled || !ref.current) return;
       ref.current.innerHTML = '';
       paypal.Buttons({
@@ -72,7 +76,16 @@ export default function PayPalCheckout({ projectId, target, amount, label, inten
               {!done && <button className="btn-primary" disabled={!order || busy} onClick={confirmSim}>{busy ? 'Confirming…' : 'Approve simulated payment'}</button>}
             </div>
           ) : (
-            <div><div className="mb-2 text-xs text-ink-3">PayPal {config?.paypal.mode === 'PAYPAL_SANDBOX' ? 'Sandbox' : 'Live'} — funding status updates only after the server verifies PayPal's response.</div><div ref={ref} />{busy && <Spinner label="Verifying with PayPal…" />}</div>
+            <div>
+              <div className="mb-2 text-xs text-ink-3">PayPal {config?.paypal.mode === 'PAYPAL_SANDBOX' ? 'Sandbox' : 'Live'} — funding status updates only after the server verifies PayPal's response.</div>
+              {config?.paypal.mode === 'PAYPAL_SANDBOX' && (
+                <div className="mb-3 rounded-[3px] border border-rule bg-paper px-3 py-2 text-[12px] text-ink-2">
+                  Sandbox: click <b className="font-medium">PayPal</b> and log in with your sandbox <b className="font-medium">personal</b> account
+                  (developer.paypal.com → Testing tools → Sandbox accounts). Real cards and real logins do not work here, and no real money moves.
+                </div>
+              )}
+              <div ref={ref} />{busy && <Spinner label="Verifying with PayPal…" />}
+            </div>
           )}
           {done && <div className="rounded-[3px] bg-released-wash p-2 text-released">{done}. Funding status updated.</div>}
           <ErrorNote error={err} />

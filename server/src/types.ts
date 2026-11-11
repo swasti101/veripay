@@ -208,6 +208,19 @@ export interface Submission {
   authorization: { granted: boolean; scope: string; credentialsProvided: boolean } | null;
   revision: number;
   createdAt: string;
+  /** Pre-check: a submission with too much left unfinished goes back to the freelancer
+   *  before the client is asked to review it. The freelancer can still send it on, with a
+   *  reason, so a check that cannot reach the site never blocks payment indefinitely. */
+  precheck?: {
+    passed: boolean;
+    unfinished: string[];      // requirement ids needing freelancer work (FAIL / UNVERIFIED / PARTIAL)
+    awaitingClient: string[];  // NEEDS_CLARIFICATION — the client's input, not counted against the freelancer
+    considered: number;        // requirements the freelancer can act on
+    threshold: number;         // share of considered requirements allowed to be unfinished
+    at: string;
+    sentAnywayAt?: string;
+    sentAnywayReason?: string;
+  };
 }
 
 export interface KernelRun {

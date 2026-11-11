@@ -5,7 +5,7 @@ import { requireUser, requireVerifiedEmail, startSession, endSession, currentUse
 import { sendMail, recentMail, emailConfigured } from './services/email.js';
 import { issueResend } from './auth-helpers.js';
 import { rateLimit } from './services/ratelimit.js';
-import { HttpError, fail, loadProject, touch, msState, newDraftFrom, validateAgreement, finalizeIfApproved, refreshFunding, inviteCode, projectView, partyOf, moneySummary, pendingActions } from './logic.js';
+import { HttpError, fail, loadProject, touch, msState, newDraftFrom, validateAgreement, finalizeIfApproved, refreshFunding, inviteCode, projectView, partyOf, moneySummary, pendingActions, evaluatePrecheck, withFreelancer, latestSubmission } from './logic.js';
 import { activeAgreement, draftAgreement, askPM, AGENTS, coordinate } from './services/pm.js';
 import { extractSOW, recommendFunding } from './services/sow.js';
 import { runKernelInspection, kernelConfigured, computerAgentMode } from './services/kernel.js';
@@ -736,10 +736,17 @@ function startQA(p: Project, submissionId: string, actor: User) {
       Object.assign(run, out, { kernel, status: 'COMPLETE' });
       for (const r of out.results) { const rq = ag.requirements.find((x) => x.id === r.requirementId); if (rq) rq.status = r.status; }
       const st = msState(p, sub.milestoneId);
-      if (st.workStatus === 'SUBMITTED') st.workStatus = 'QA_COMPLETE';
+      // Pre-check: too much unfinished → back to the freelancer before the client is asked.
+      sub.precheck = evaluatePrecheck(out.results);
+      const returned = !sub.precheck.passed;
+      if (returned) st.workStatus = 'IN_PROGRESS';
+      else if (st.workStatus === 'SUBMITTED') st.workStatus = 'QA_COMPLETE';
       audit({ projectId: p.id, actor: 'qa-mediator', actorType: 'agent', action: 'QA_COMPLETED', details: `${out.overall}. ${out.mediatorSummary} (AI: ${out.aiSource})`, refs: [{ type: 'qa', id: run.id }] });
-      // Both parties get the verdict…
-      postMessage({ projectId: p.id, from: 'ai-coordinator', fromType: 'agent', agent: AGENTS.mediator, audience: 'all', kind: 'notice', text: `Verification of ${sub.milestoneId} (revision ${sub.revision}) is done: ${out.overall.replace(/_/g, ' ').toLowerCase()}. ${out.mediatorSummary}`, ref: { type: 'qa', id: run.id } });
+      if (returned) {
+        audit({ projectId: p.id, actor: 'qa-mediator', actorType: 'agent', action: 'PRECHECK_RETURNED', details: `Revision ${sub.revision} returned to the freelancer before client review: ${sub.precheck.unfinished.length} of ${sub.precheck.considered} requirements unfinished (${sub.precheck.unfinished.join(', ')}); limit ${Math.round(sub.precheck.threshold * 100)}%.`, refs: [{ type: 'qa', id: run.id }, { type: 'submission', id: sub.id }] });
+      }
+      // The verdict goes to both parties only once the work is actually in front of the client.
+      postMessage({ projectId: p.id, from: 'ai-coordinator', fromType: 'agent', agent: AGENTS.mediator, audience: returned ? 'freelancer' : 'all', kind: 'notice', text: `Verification of ${sub.milestoneId} (revision ${sub.revision}) is done: ${out.overall.replace(/_/g, ' ').toLowerCase()}. ${out.mediatorSummary}`, ref: { type: 'qa', id: run.id } });
       // …and the freelancer gets concrete, per-requirement next steps, so they can fix and
       // resubmit without waiting for the client to read the report.
       const todo = out.results.filter((r) => r.status !== 'PASS' && r.status !== 'OUT_OF_SCOPE');
@@ -753,11 +760,19 @@ function startQA(p: Project, submissionId: string, actor: User) {
                 : 'Part of this is in place; finish the rest and resubmit.';
           return `• ${r.requirementId} ${reqTitle(r.requirementId)} — ${r.status.replace(/_/g, ' ').toLowerCase()}. ${why} ${ask}`;
         });
-        postMessage({ projectId: p.id, from: 'ai-coordinator', fromType: 'agent', agent: AGENTS.freelancer, audience: 'freelancer', kind: 'evidence_request', text: `Here is what the checks found on ${sub.milestoneId} and what would move each item forward:\n${lines.join('\n')}`, ref: { type: 'qa', id: run.id } });
+        const head = returned
+          ? `This revision has not gone to the client yet: ${sub.precheck.unfinished.length} of ${sub.precheck.considered} requirements still need work, and more than ${Math.round(sub.precheck.threshold * 100)}% unfinished goes back to you first. Here is what each needs:`
+          : `Here is what the checks found on ${sub.milestoneId} and what would move each item forward:`;
+        const tail = returned
+          ? `\n\nFix these and submit a revision. If you think a check could not see your work properly — for example the site is not publicly reachable — you can send this revision to the client anyway, with a reason.`
+          : '';
+        postMessage({ projectId: p.id, from: 'ai-coordinator', fromType: 'agent', agent: AGENTS.freelancer, audience: 'freelancer', kind: 'evidence_request', text: `${head}\n${lines.join('\n')}${tail}`, ref: { type: 'qa', id: run.id } });
       } else {
         postMessage({ projectId: p.id, from: 'ai-coordinator', fromType: 'agent', agent: AGENTS.freelancer, audience: 'freelancer', kind: 'notice', text: `Every requirement on ${sub.milestoneId} passed verification. The client now reviews it; you will be notified when a payment decision is ready.`, ref: { type: 'qa', id: run.id } });
       }
-      postMessage({ projectId: p.id, from: 'ai-coordinator', fromType: 'agent', agent: AGENTS.client, audience: 'client', kind: 'notice', text: `${sub.milestoneId} has been verified. Please review it and say how satisfied you are — your feedback is weighed against the agreed scope, so be specific about which requirement any concern relates to.`, ref: { type: 'qa', id: run.id } });
+      if (!returned) {
+        postMessage({ projectId: p.id, from: 'ai-coordinator', fromType: 'agent', agent: AGENTS.client, audience: 'client', kind: 'notice', text: `${sub.milestoneId} has been verified. Please review it and say how satisfied you are — your feedback is weighed against the agreed scope, so be specific about which requirement any concern relates to.`, ref: { type: 'qa', id: run.id } });
+      }
     } catch (e: any) {
       run.status = 'ERROR'; run.error = e.message;
       audit({ projectId: p.id, actor: 'qa-mediator', actorType: 'agent', action: 'QA_ERROR', details: e.message, refs: [{ type: 'qa', id: run.id }] });
@@ -773,6 +788,25 @@ api.post('/projects/:id/submissions/:sid/rerun-qa', h((req) => {
   startQA(p, sub.id, u);
 }));
 
+/** The freelancer disagrees with the pre-check (e.g. the agent could not reach the site) and
+ *  asks the client to review anyway. Recorded with the reason, which the client sees. */
+api.post('/projects/:id/submissions/:sid/send-to-client', h((req) => {
+  const u = U(req);
+  const { p } = loadProject(String(req.params.id), u, ['freelancer']);
+  const sub = db().submissions.find((s) => s.id === req.params.sid && s.projectId === p.id) || fail(404, 'Submission not found');
+  if (!withFreelancer(sub)) fail(409, 'This revision is not being held back');
+  if (latestSubmission(p.id, sub.milestoneId)?.id !== sub.id) fail(409, 'Only the latest revision can be sent on');
+  const reason = str(req.body?.reason, 1000);
+  if (reason.length < 10) fail(400, 'Say briefly why the client should review it as it is');
+  sub.precheck!.sentAnywayAt = now();
+  sub.precheck!.sentAnywayReason = reason;
+  const st = msState(p, sub.milestoneId);
+  if (['IN_PROGRESS', 'SUBMITTED'].includes(st.workStatus)) st.workStatus = 'QA_COMPLETE';
+  audit({ projectId: p.id, actor: u.id, actorType: 'user', action: 'PRECHECK_OVERRIDDEN', details: `Freelancer sent revision ${sub.revision} to the client despite the pre-check (${sub.precheck!.unfinished.join(', ')} unfinished). Reason: ${reason}`, refs: [{ type: 'submission', id: sub.id }] });
+  postMessage({ projectId: p.id, from: 'ai-coordinator', fromType: 'agent', agent: AGENTS.client, audience: 'client', kind: 'notice', text: `${sub.milestoneId} revision ${sub.revision} is ready for your review. The automated checks could not confirm ${sub.precheck!.unfinished.join(', ')}; the freelancer asked you to review it anyway and said: "${reason}". You will see the full verification report, including what was not confirmed.` });
+  touch(p);
+}));
+
 // ───────────────────────── client satisfaction ─────────────────────────
 api.post('/projects/:id/milestones/:mid/feedback', h(async (req) => {
   const u = U(req);
@@ -780,6 +814,7 @@ api.post('/projects/:id/milestones/:mid/feedback', h(async (req) => {
   const mid = String(req.params.mid);
   const ag = activeAgreement(p)!;
   const sub = db().submissions.filter((s) => s.projectId === p.id && s.milestoneId === mid).at(-1) || fail(409, 'Nothing has been submitted for this milestone');
+  if (withFreelancer(sub)) fail(409, 'The latest revision went back to the freelancer before review. You will be asked for feedback once they resubmit.');
   const rating = req.body?.rating;
   if (!['FULLY_SATISFIED', 'PARTIALLY_SATISFIED', 'NOT_SATISFIED'].includes(rating)) fail(400, 'Choose a satisfaction level');
   const items = (Array.isArray(req.body?.items) ? req.body.items : []).map((i: any) => ({ text: str(i.text, 1000), requirementId: str(i.requirementId, 12) || null })).filter((i: any) => i.text);
@@ -834,6 +869,7 @@ api.post('/projects/:id/milestones/:mid/expert-review', h((req) => {
   const ag = activeAgreement(p)!;
   const st = msState(p, mid);
   if (db().expertReviews.some((r) => r.projectId === p.id && r.milestoneId === mid && (r.status === 'AWAITING_FEE_ACK' || r.status === 'VOTING'))) fail(409, 'An expert review is already open for this milestone');
+  if (withFreelancer(latestSubmission(p.id, mid))) fail(409, 'The latest revision is back with the freelancer after the pre-check. Expert review starts from work the client has been asked to review.');
   const qa = db().qaRuns.filter((q) => q.projectId === p.id && q.milestoneId === mid && q.status === 'COMPLETE').at(-1) || fail(409, 'Run QA first — expert review needs an evidence packet');
   const fb = db().feedback.filter((f) => f.projectId === p.id && f.milestoneId === mid).at(-1) || null;
   let reqIds: string[] = Array.isArray(req.body?.requirementIds) ? req.body.requirementIds.map(String) : [];
@@ -1024,6 +1060,7 @@ api.post('/projects/:id/milestones/:mid/allocation', h((req) => {
   const ag = activeAgreement(p) || fail(409, 'No approved agreement');
   const st = msState(p, mid);
   const d = db();
+  if (withFreelancer(latestSubmission(p.id, mid))) fail(409, 'The latest revision is back with the freelancer after the pre-check, so there is nothing to decide payment on yet.');
   const qa = d.qaRuns.filter((q) => q.projectId === p.id && q.milestoneId === mid && q.status === 'COMPLETE').at(-1) || null;
   const feedback = d.feedback.filter((f) => f.projectId === p.id && f.milestoneId === mid).at(-1) || null;
   const review = d.expertReviews.filter((r) => r.projectId === p.id && r.milestoneId === mid).at(-1) || null;

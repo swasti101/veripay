@@ -24,6 +24,59 @@ export function ChallengeButton({ projectId, targetType, targetId, requirementId
   );
 }
 
+/** Freelancer side of the pre-check: why this revision has not reached the client, and the
+ *  two ways forward — fix and resubmit, or send it on with a reason. */
+function PrecheckBanner({ sub, isLatest, projectId, reload, onRevise }: { sub: any; isLatest: boolean; projectId: string; reload: () => Promise<void>; onRevise: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState('');
+  const a = useAction();
+  const pc = sub?.precheck;
+  if (!pc) return null;
+  if (pc.passed) {
+    return (
+      <div className="mb-4 rounded-[3px] border-l-2 border-released bg-released-wash px-4 py-3 text-[13px] text-released">
+        <b className="font-medium">Passed the pre-check</b> — this revision is with the client for review.
+      </div>
+    );
+  }
+  if (pc.sentAnywayAt) {
+    return (
+      <div className="mb-4 rounded-[3px] border-l-2 border-seal bg-seal-wash px-4 py-3 text-[13px] text-seal">
+        <b className="font-medium">You sent this to the client anyway.</b> They see the full report, including what the checks could not confirm, and your reason: "{pc.sentAnywayReason}"
+      </div>
+    );
+  }
+  const pct = Math.round(pc.threshold * 100);
+  return (
+    <div className="mb-4 rounded-[3px] border border-hold/40 bg-hold-wash p-4 text-[13px]">
+      <div className="font-medium text-hold">Not sent to the client yet</div>
+      <p className="mt-1 text-ink-2">
+        {pc.unfinished.length} of {pc.considered} requirement{pc.considered === 1 ? '' : 's'} you can act on still need work
+        ({pc.unfinished.join(', ')}). When more than {pct}% are unfinished, the revision comes back to you first, so the
+        client only reviews work that is ready.
+        {pc.awaitingClient.length > 0 && <> {pc.awaitingClient.join(', ')} {pc.awaitingClient.length === 1 ? 'needs' : 'need'} the client to clarify wording — that never counts against you.</>}
+      </p>
+      {isLatest && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button className="btn-primary" onClick={onRevise}>Fix and submit a revision</button>
+          <button className="btn-secondary" onClick={() => setOpen(!open)}>Send to the client anyway</button>
+        </div>
+      )}
+      {open && (
+        <div className="mt-3 space-y-2">
+          <label className="field-label" htmlFor="sendanyway">Why should the client review it as it is?</label>
+          <textarea id="sendanyway" className="input" rows={2} value={reason} onChange={(e) => setReason(e.target.value)}
+            placeholder="e.g. The site is on a private staging server the agent cannot reach; the attached recording shows search and checkout working." />
+          <p className="text-[12px] text-ink-3">The client sees your reason and the full report, including what was not confirmed.</p>
+          <ErrorNote error={a.error} />
+          <button className="btn-primary" disabled={a.busy || reason.trim().length < 10}
+            onClick={() => a.run(async () => { await api.post(`/projects/${projectId}/submissions/${sub.id}/send-to-client`, { reason }); setOpen(false); await reload(); })}>Send to client</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const MODE_COPY: Record<string, string> = {
   KERNEL_LIVE: 'a Kernel cloud browser',
   LOCAL_BROWSER: 'a real browser on this server (not Kernel)',
@@ -176,10 +229,13 @@ export default function Delivery({ v, reload, mid }: WsProps) {
                     {s.url && <a className="mono block truncate text-seal underline" href={s.url} target="_blank" rel="noreferrer">{s.url}</a>}
                     {s.notes && <div className="mt-0.5 text-[12px] text-ink-2">{s.notes}</div>}
                   </div>
-                  {q && <Badge>{q.status === 'RUNNING' ? 'UNDER_REVIEW' : q.overall}</Badge>}
+                  {q && (q.heldForFreelancer || (s.precheck && !s.precheck.passed && !s.precheck.sentAnywayAt)
+                    ? <Badge tone="hold">Back with freelancer</Badge>
+                    : <Badge>{q.status === 'RUNNING' ? 'UNDER_REVIEW' : q.overall}</Badge>)}
+                  {s.precheck?.sentAnywayAt && <Badge tone="seal">Sent on by freelancer</Badge>}
                   <div className="flex gap-1">
-                    {q && !active && <button className="btn-secondary" onClick={() => setQaId(q.id)}>View report</button>}
-                    <button className="btn-ghost" disabled={a.busy} onClick={() => a.run(async () => { await api.post(`/projects/${p.id}/submissions/${s.id}/rerun-qa`); await reload(); })}>Check again</button>
+                    {q && !active && !q.heldForFreelancer && <button className="btn-secondary" onClick={() => setQaId(q.id)}>View report</button>}
+                    {party === 'freelancer' && <button className="btn-ghost" disabled={a.busy} onClick={() => a.run(async () => { await api.post(`/projects/${p.id}/submissions/${s.id}/rerun-qa`); await reload(); })}>Check again</button>}
                   </div>
                 </div>
               );
@@ -189,9 +245,25 @@ export default function Delivery({ v, reload, mid }: WsProps) {
       )}
 
       {/* ── The report ── */}
-      {qa ? (
+      {qa && qa.heldForFreelancer ? (
+        // Client side: the revision exists and went back; its findings are the freelancer's working notes.
+        <div className="sheet p-5">
+          <h3 className="h2">Revision {subs.find((s: any) => s.id === qa.submissionId)?.revision} went back to the freelancer</h3>
+          <p className="mt-1.5 max-w-2xl text-[13px] text-ink-2">
+            The automated checks found too much still unfinished to ask for your review yet, so it was returned to the
+            freelancer with what to fix. You will be asked to review once a revision passes — or if the freelancer
+            sends this one to you with a reason. Nothing is decided and no money moves in the meantime.
+          </p>
+        </div>
+      ) : qa ? (
         <div>
           <h3 className="h2 mb-3">Verification report</h3>
+          {party === 'freelancer' && <PrecheckBanner sub={subs.find((s: any) => s.id === qa.submissionId)} isLatest={qa.submissionId === subs.at(-1)?.id} projectId={p.id} reload={reload} onRevise={() => setShowForm(true)} />}
+          {party === 'client' && subs.find((s: any) => s.id === qa.submissionId)?.precheck?.sentAnywayReason && (
+            <div className="mb-4 rounded-[3px] border-l-2 border-hold bg-hold-wash px-4 py-3 text-[13px] text-hold">
+              <b className="font-medium">Sent to you despite unfinished checks.</b> The freelancer said: "{subs.find((s: any) => s.id === qa.submissionId)?.precheck?.sentAnywayReason}"
+            </div>
+          )}
           <VerificationReport qa={qa} ag={ag} projectId={p.id} reload={reload} />
         </div>
       ) : !formOpen && (

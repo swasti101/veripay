@@ -52,19 +52,41 @@ function VerdictHeader({ qa }: { qa: any }) {
           ))}
         </div>
       </div>
-      <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 border-t border-rule pt-3 text-[12px] text-ink-3">
+      {/* Plain-language meaning of each verdict that appears in this report. */}
+      <dl className="mt-4 space-y-1 border-t border-rule pt-3 text-[13px]">
+        {Object.keys(counts).map((s) => (
+          <div key={s} className="flex gap-2">
+            <dt className="w-[150px] shrink-0"><Badge>{s}</Badge></dt>
+            <dd className="text-ink-2">{STATUS_MEANING[s]}</dd>
+          </div>
+        ))}
+      </dl>
+      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 border-t border-rule pt-3 text-[12px] text-ink-3">
         <span>Checked {dt(qa.createdAt)}</span>
         <span>Computer agent: <span className="text-ink-2">{AGENT_MODE[qa.kernel.mode]?.label || qa.kernel.mode}</span></span>
-        <span>Vision and text: <span className="text-ink-2">{qa.aiSource.startsWith('heuristic') ? 'rule-based (no AI key set)' : qa.aiSource}</span></span>
+        <span>Vision: <span className="text-ink-2">{qa.vision.source.startsWith('heuristic') ? 'not run (no AI key)' : qa.vision.source}</span></span>
+        <span>Text and mediator: <span className="text-ink-2">{qa.aiSource.startsWith('heuristic') ? 'rule-based (no AI key)' : qa.aiSource}</span></span>
       </div>
     </div>
   );
 }
 
+const STATUS_MEANING: Record<string, string> = {
+  PASS: 'Every acceptance criterion has evidence that it is met.',
+  PARTIAL: 'Some criteria are met and some are not yet.',
+  FAIL: 'There is evidence that a criterion is not met — something was checked and it did not work.',
+  UNVERIFIED: 'The analysers found no evidence either way. This is not a failure: it means "show us", not "you got it wrong".',
+  NEEDS_CLARIFICATION: 'The agreed wording cannot be measured (for example "fast"). The client needs to say what they meant; it never counts against the freelancer.',
+  OUT_OF_SCOPE: 'Not part of the agreement, so it does not affect this milestone.',
+};
+
 function RequirementRow({ r, req, qa, projectId, reload }: { r: any; req: any; qa: any; projectId: string; reload: () => void }) {
   const [open, setOpen] = useState(r.status !== 'PASS');
   const vision = qa.vision.findings.filter((f: any) => f.requirementId === r.requirementId);
-  const text = qa.text.findings.filter((f: any) => f.requirementId === r.requirementId);
+  // Models sometimes echo the vision observation into the text findings; show it once.
+  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
+  const seenVision = new Set(vision.map((f: any) => norm(f.observation)));
+  const text = qa.text.findings.filter((f: any) => f.requirementId === r.requirementId && !seenVision.has(norm(f.observation)));
   const groups = { agent: [] as string[], text: [] as string[], claim: [] as string[] };
   for (const e of r.evidence) groups[sourceOf(e)].push(e.replace(/^(Computer agent \([^)]*\)|Demo adapter \(static HTML\)):\s*/i, ''));
   return (
