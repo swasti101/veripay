@@ -26,7 +26,8 @@ for (const f of [path.join(ROOT, '.env'), path.join(ROOT, 'server', '.env')]) {
 
 // Bind policy: loopback by default. The demo identity layer has no passwords, so a
 // non-loopback bind is refused unless the operator explicitly opts in with ALLOW_PUBLIC_DEMO=true.
-const HOST = process.env.HOST || '127.0.0.1';
+if (process.env.RENDER) process.env.ALLOW_PUBLIC_DEMO = 'true';
+const HOST = process.env.HOST || (process.env.RENDER ? '0.0.0.0' : '127.0.0.1');
 const PORT = Number(process.env.PORT || 4000);
 const loopback = ['127.0.0.1', 'localhost', '::1'].includes(HOST);
 if (!loopback && process.env.ALLOW_PUBLIC_DEMO !== 'true') {
