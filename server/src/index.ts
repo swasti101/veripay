@@ -26,8 +26,10 @@ for (const f of [path.join(ROOT, '.env'), path.join(ROOT, 'server', '.env')]) {
 
 // Bind policy: loopback by default. The demo identity layer has no passwords, so a
 // non-loopback bind is refused unless the operator explicitly opts in with ALLOW_PUBLIC_DEMO=true.
-if (process.env.RENDER) process.env.ALLOW_PUBLIC_DEMO = 'true';
-const HOST = process.env.HOST || (process.env.RENDER ? '0.0.0.0' : '127.0.0.1');
+const prod = process.env.NODE_ENV === 'production';
+const isCloud = prod || !!(process.env.RENDER || process.env.RENDER_SERVICE_ID || process.env.RAILWAY_STATIC_URL);
+if (isCloud) process.env.ALLOW_PUBLIC_DEMO = 'true';
+const HOST = isCloud ? '0.0.0.0' : (process.env.HOST || '127.0.0.1');
 const PORT = Number(process.env.PORT || 4000);
 const loopback = ['127.0.0.1', 'localhost', '::1'].includes(HOST);
 if (!loopback && process.env.ALLOW_PUBLIC_DEMO !== 'true') {
@@ -38,7 +40,7 @@ if (!loopback && process.env.ALLOW_PUBLIC_DEMO !== 'true') {
 const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
-const prod = process.env.NODE_ENV === 'production';
+// prod is defined above
 app.use((_, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
