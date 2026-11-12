@@ -20,3 +20,4 @@ apimatic/sdk/
 .DS_Store
 .vscode/
 .idea/
+.bin/
