@@ -37,9 +37,14 @@ export default function CreateProject() {
         <div>
           <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
             <label className="label !mb-0">Statement of Work</label>
-            <button type="button" className="btn-ghost text-xs" onClick={async () => { const s = await api.get('/demo/sample-sow'); setF({ ...f, sowText: s.text, title: f.title || 'Northwind Outfitters — E-Commerce Storefront' }); setFile(null); }}>
-              Load sample e-commerce SOW <SimTag label="DEMO" />
-            </button>
+            <div className="flex flex-wrap items-center gap-1">
+              <span className="text-[12px] text-ink-3">Load a sample SOW <SimTag label="DEMO" />:</span>
+              {([['northwind', 'Northwind store (hosted here)'], ['toolshop', 'Toolshop (public live site)']] as const).map(([kind, label]) => (
+                <button key={kind} type="button" className="btn-ghost text-xs" onClick={async () => { const s = await api.get(`/demo/sample-sow?kind=${kind}`); setF({ ...f, sowText: s.text, title: f.title || s.title }); setFile(null); }}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
           <textarea className="input font-mono text-xs" rows={14} value={f.sowText} disabled={!!file} onChange={(e) => setF({ ...f, sowText: e.target.value })} placeholder="Paste the SOW text, or upload a .txt / .md file below." />
           <div className="mt-2 flex items-center gap-3 text-sm">

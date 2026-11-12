@@ -31,6 +31,42 @@ Payment of each milestone is due after its acceptance criteria are verified and 
 - Hosting on the client's existing account
 `;
 
+// Written to match the public practice store at practicesoftwaretesting.com (Testsmith's
+// "Toolshop"), which also publishes a build with planted bugs. Those two builds stand in for
+// the freelancer's revision 1 and revision 2, so the demo needs no deployment and Kernel can
+// reach them. Every criterion here is something the computer agent can actually exercise.
+export const TOOLSHOP_SOW = `STATEMENT OF WORK — Toolshop Online Hardware Store
+Client: Toolshop Ltd. Freelancer: independent web developer.
+1. Scope
+Build the storefront for an online hardware store: a product catalogue, search, sorting and filters, and a shopping cart. Checkout follows in a second milestone.
+2. Requirements
+2.1 Product catalogue — Catalogue page showing tools in a grid. Acceptance: shows products with image, name and price; each card opens the product's detail page; every image has alt text. [$900]
+2.2 Search — Search box on the catalogue with a search button. Acceptance: searching for a product name shows only matching products; when nothing matches, a "no products found" message is shown. [$700]
+2.3 Sorting and filters — Sort and filter the catalogue. Acceptance: sorting by price from low to high lists the cheapest product first; the category filter and the brand filter can be combined. [$800]
+2.4 Shopping cart — Cart reachable from the header. Acceptance: Add to cart on the product page updates the cart count; in the cart, changing the quantity updates the line total and the order total; an item can be removed from the cart. [$1,100]
+2.5 Checkout — Guest or signed-in checkout. Acceptance: billing address and payment method steps; required fields are validated; an order confirmation is shown after a sandbox payment. [$1,500]
+3. Milestones & Payment
+Advance: $500 payable when the agreement is signed, credited against the total.
+Milestone 1 — Storefront (2.1, 2.2, 2.3, 2.4) — start 2026-11-02 — due 2026-11-27 — $3,500
+Milestone 2 — Checkout (2.5) — start 2026-11-30 — due 2026-12-18 — $1,500
+Total project budget: $5,500
+Payment of each milestone is due after its acceptance criteria are verified and approved.
+4. Exclusions
+- Native mobile apps
+- Product photography and copywriting
+- Live payment processing (sandbox only)
+5. Assumptions
+- Product, category and brand data come from the client's existing API
+`;
+
+/** The two public builds that play revision 1 and revision 2 of the Toolshop deliverable. */
+export const TOOLSHOP_DEMO = {
+  broken: 'https://with-bugs.practicesoftwaretesting.com/',
+  fixed: 'https://practicesoftwaretesting.com/',
+  source: 'Public practice store by Testsmith (practicesoftwaretesting.com) — standing in for the freelancer’s work. Shared sandbox: other testers can change its data.',
+  bugs: 'price sort is reversed, an empty search shows no message, the cart line price stays $0.00, Remove does nothing, and product images have no alt text',
+};
+
 const DENTAL_SOW = `STATEMENT OF WORK — Harbor Dental Clinic Website
 1. Scope
 A five-page marketing website for a dental clinic with online appointment requests.
@@ -230,7 +266,57 @@ export async function seed(force = false) {
   A(p3.id, 'allocation-engine', 'system', 'ALLOCATION_RECOMMENDED', `${al3.releaseType}: eligible $${al3.eligibleAmount}, held $${al3.disputedAmount}. ${al3.rule}`, ago(4));
   A(p3.id, 'demo', 'user', 'REVISION_REQUESTED', 'REQ-02 PDF export to be fixed', ago(4));
 
+  addToolshopProject(client.id, free.id);
+  d.meta.toolshopAddedAt = T;
   d.meta.seededAt = T;
   flushNow();
   console.log('[seed] demo data created');
+}
+
+/** Toolshop: agreement signed, advance paid, M1 funded and in progress — ready for revision 1.
+ *  Everything financial is simulated and labelled; the deliverable URLs are real public sites. */
+function addToolshopProject(clientId: string, freeId: string) {
+  const d = db();
+  const at = ago(6);
+  const ag = agreementFrom(TOOLSHOP_SOW, clientId, 1, { option: 'PARTIAL', committed: ['M1'] }, at);
+  const p: Project = {
+    id: id('prj'), title: 'Toolshop — Online Hardware Store',
+    description: 'Live-site demo: revision 1 is the public "with bugs" build, revision 2 the fixed build. The computer agent (Kernel or local browser) catches the planted bugs; the pre-check returns revision 1 to the freelancer.',
+    category: 'website', createdBy: clientId, initiatorRole: 'client', clientId, freelancerId: freeId,
+    invite: { code: Math.random().toString(16).slice(2, 12).toUpperCase(), role: 'freelancer', email: 'sam.freelancer@demo.veripay.invalid', status: 'ACCEPTED' },
+    status: 'ACTIVE', agreementVersions: [ag], activeAgreementId: ag.id, draftAgreementId: null,
+    milestoneStates: ag.milestones.map((m) => ({ milestoneId: m.id, fundingStatus: 'FUNDING_REQUIRED', workStatus: 'NOT_STARTED', authorized: 0, captured: 0, paid: 0, platformFee: 0, underReview: 0 })),
+    advance: { status: 'PAID', amount: ag.advanceAmount, paid: ag.advanceAmount, platformFee: 0 },
+    isDemo: true, demoLabel: 'LIVE SITE DEMO', demoUrls: TOOLSHOP_DEMO, createdAt: at, updatedAt: now(),
+  };
+  d.projects.push(p);
+  const m1 = ag.milestones[0];
+  const auth = simId('AUTH');
+  d.transactions.push(
+    simTx({ projectId: p.id, type: 'ADVANCE_PAYMENT', amount: ag.advanceAmount, status: 'COMPLETED', paypal: { orderId: simId('ORDER'), captureId: simId('CAPTURE') } }, ago(6)),
+    simTx({ projectId: p.id, type: 'FREELANCER_PAYOUT', amount: ag.advanceAmount, status: 'SUCCESS', payee: freeId, paypal: { payoutBatchId: simId('PAYOUT') } }, ago(6)),
+    simTx({ projectId: p.id, milestoneId: m1.id, type: 'MILESTONE_AUTHORIZATION', amount: m1.amount, status: 'AUTHORIZED', paypal: { orderId: simId('ORDER'), authorizationId: auth }, note: 'DEMO SEED — simulated authorization' }, ago(5)),
+  );
+  Object.assign(p.milestoneStates[0], { authorized: m1.amount, fundingStatus: 'AUTHORIZED', workStatus: 'IN_PROGRESS', authorizationId: auth, authorizationExpires: new Date(Date.now() + 24 * 864e5).toISOString(), honorPeriodEnds: ago(2) });
+  const A = (action: string, details: string, days: number) => d.audit.push({ id: id('aud'), projectId: p.id, actor: 'demo', actorType: 'user', action, details: `[DEMO SEED] ${details}`, refs: [], at: ago(days) });
+  A('PROJECT_CREATED', 'Client created project and uploaded SOW', 7);
+  A('AGREEMENT_APPROVED', 'Agreement v1 approved by both parties', 6);
+  A('TX_ADVANCE_PAYMENT', `[SIMULATED] Advance $${ag.advanceAmount} captured and paid out`, 6);
+  A('TX_MILESTONE_AUTHORIZATION', `[SIMULATED] M1 $${m1.amount} authorized`, 5);
+  A('MILESTONE_STARTED', 'Freelancer started M1 Storefront', 5);
+  d.messages.push({ id: id('msg'), projectId: p.id, from: 'ai-coordinator', fromType: 'agent', agent: 'AI Project Manager', audience: 'all', kind: 'notice', createdAt: ago(5),
+    text: 'M1 Storefront is funded and in progress. When it is ready, submit the staging URL: the computer agent will search, sort, filter, use the cart and check alt text against REQ-01 to REQ-04.' });
+}
+
+/** Adds the Toolshop demo once to a database seeded before it existed. Never touches other projects. */
+export function ensureToolshopDemo() {
+  const d = db();
+  if (!d.meta.seededAt || d.meta.toolshopAddedAt) return;
+  const client = d.users.find((u) => u.email === 'alex.client@demo.veripay.invalid');
+  const free = d.users.find((u) => u.email === 'sam.freelancer@demo.veripay.invalid');
+  if (!client || !free) return;
+  if (!d.projects.some((p) => p.demoUrls)) addToolshopProject(client.id, free.id);
+  d.meta.toolshopAddedAt = now();
+  flushNow();
+  console.log('[seed] added the Toolshop live-site demo project');
 }

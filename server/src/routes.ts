@@ -14,7 +14,7 @@ import { computeAllocation, aggregateVotes } from './services/allocation.js';
 import { selectPanel, simulateVote } from './services/experts.js';
 import * as pp from './services/paypal.js';
 import { aiJSON, aiLabel, aiProvider } from './services/ai.js';
-import { seed, SAMPLE_SOW } from './seed.js';
+import { seed, SAMPLE_SOW, TOOLSHOP_SOW } from './seed.js';
 import type { Party, Project, Transaction, User, ExpertReview, Requirement, Milestone, FundingOption } from './types.js';
 
 export const api = express.Router();
@@ -96,7 +96,7 @@ api.get('/auth/dev-mailbox', h((_req, res) => {
 // Reset & reseed the demo dataset (local demo convenience; requires a session).
 api.post('/demo/reset', requireUser, h(async (req, res) => { await seed(true); endSession(req, res); return { ok: true }; }));
 
-api.get('/demo/sample-sow', h(() => ({ text: SAMPLE_SOW })));
+api.get('/demo/sample-sow', h((req) => (req.query.kind === 'toolshop' ? { text: TOOLSHOP_SOW, title: 'Toolshop — Online Hardware Store' } : { text: SAMPLE_SOW, title: 'Northwind Outfitters — E-Commerce Storefront' })));
 
 api.use(requireUser);
 
@@ -692,7 +692,7 @@ api.post('/projects/:id/milestones/:mid/submissions', upload.array('files', 8), 
     const ext = (f.originalname.split('.').pop() || 'bin').toLowerCase();
     return { id: id('ev'), kind: isImg ? 'screenshot' : 'file', label: f.originalname.slice(0, 120), path: saveEvidenceFile(f.buffer, isImg ? ext : isText ? 'txt' : ext), mime: isImg ? f.mimetype : isText ? 'text/plain' : f.mimetype, text: isText ? f.buffer.toString('utf8').slice(0, 20000) : undefined, source: 'freelancer' } as any;
   });
-  if (req.body?.demoEvidence === 'true') evidence.push({ id: id('ev'), kind: 'file', label: 'DEMO sample test report (seeded file, not produced by the freelancer)', text: DEMO_TEST_REPORT(activeAgreement(p)!.requirements.filter((r) => r.milestoneId === mid)), mime: 'text/plain', source: 'seed' });
+  if (req.body?.demoEvidence === 'true') evidence.push({ id: id('ev'), kind: 'file', label: 'DEMO sample test report (seeded file, not produced by the freelancer)', text: DEMO_TEST_REPORT(activeAgreement(p)!.requirements.filter((r) => r.milestoneId === mid), !p.demoUrls), mime: 'text/plain', source: 'seed' });
   if (!url && !evidence.length && !str(req.body?.notes)) fail(400, 'Provide a URL, files, or notes');
   const revision = db().submissions.filter((s) => s.projectId === p.id && s.milestoneId === mid).length + 1;
   const sub = {
@@ -709,8 +709,10 @@ api.post('/projects/:id/milestones/:mid/submissions', upload.array('files', 8), 
   return { submission: sub };
 }));
 
-function DEMO_TEST_REPORT(reqs: Requirement[]) {
-  // Deterministic sample that matches the Northwind demo store behaviour.
+function DEMO_TEST_REPORT(reqs: Requirement[], northwind = true) {
+  // Deterministic sample. For Northwind it matches the hosted store; for the live-site demo it is
+  // the freelancer's blanket claim, which the browser run then confirms or contradicts.
+  if (!northwind) return ['DEMO TEST REPORT — generated sample evidence for the hackathon demo', ...reqs.map((r) => `${r.id} PASS: checked manually in Chrome against every acceptance criterion.`)].join('\n');
   return ['DEMO TEST REPORT — generated sample evidence for the hackathon demo', ...reqs.map((r) => {
     if (/search/i.test(r.title)) return `${r.id} PASS: typing "linen" narrows 12 products to 2 within ~300ms; category and price filters combine; zero-result state shown. No typo tolerance implemented (not specified).`;
     if (/checkout/i.test(r.title)) return `${r.id} PASS: add/remove/update quantity works; totals recalc; checkout form validates required fields; order confirmation shown in sandbox mode.`;

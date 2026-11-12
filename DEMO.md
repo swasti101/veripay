@@ -15,43 +15,67 @@ Open `http://127.0.0.1:4000/`. Point at the hero specimen: one real payment deci
 the three analysers and the domain tiles: each domain names which analysers check that kind of work.
 Click **Open the demo** → **Demo** tab → **Sam Okafor** (freelancer).
 
-### 1 · Revision 1 — the agent catches two real bugs (~2 min)
-Projects → Northwind → **Submit & verify** → milestone **M2 Search & Checkout**. The first submission is
-pre-filled with **revision 1** of the storefront (`/demo-store-v1/`), which has two planted bugs: the category
-and price filters do not combine, and the cart total ignores the quantity. The sample test report is ticked
-too — it claims everything passes. Press **Submit for verification**.
+### 1 · Revision 1 — the agent catches real bugs on a live site (~2 min)
+Projects → **Toolshop — Online Hardware Store** (*live site demo*) → **Submit & verify** → **M1 Storefront**.
 
-When the run finishes:
-- An amber banner reads **Not sent to the client yet — 2 of 2 requirements you can act on still need work**.
-  More than 50% unfinished (`PRECHECK_MAX_UNFINISHED`, default 0.5), so the revision goes back to the
-  freelancer and the client never sees it.
-- **REQ-04 Fail** and **REQ-05 Fail**, each with *Fairness rule applied*: a defect reproduced in a real browser
-  outranks the AI's verdict, the sample report's "PASS" claim and REQ-04's ambiguous wording.
-- **Computer agent** tab, two red steps, each with a screenshot:
-  *Combined two filters: "tops" and "Under $50" — alone they show 3 and 2, but together 3* and
-  *Changed the quantity in the cart from 1 to 2 — order total stayed at $68*.
+The deliverable is a real public website, so there is nothing to deploy and Kernel can reach it.
+[practicesoftwaretesting.com](https://practicesoftwaretesting.com) is Testsmith's practice store for testers,
+and it publishes a second build with planted bugs at
+[with-bugs.practicesoftwaretesting.com](https://with-bugs.practicesoftwaretesting.com). In the demo these two
+builds play the freelancer's revision 1 and revision 2. Say so out loud: the freelancer didn't build it, it stands in for their work.
+
+The URL field is pre-filled with the **with-bugs** build, and the sample test report is ticked (it claims
+everything passes). Press **Submit for verification**. It takes about 40 s in Kernel, 30 s in the local browser.
+
+When it finishes:
+- An amber banner reads **Not sent to the client yet: 4 of 4 requirements you can act on still need work**.
+  The client never sees this revision.
+- Every requirement **fails on a bug the browser reproduced** (*Fairness rule applied*: this outranks the
+  report's "PASS" claim and the AI's own verdict):
+
+  | Requirement | What the agent did | What it saw |
+  |---|---|---|
+  | REQ-01 Catalogue | Checked every image on the pages it visited | 12 images have no alt text |
+  | REQ-02 Search | Searched for something that cannot match | No results, and no message telling the user why |
+  | REQ-03 Sort & filters | Sorted by "Price (Low – High)" | $125.23, $119.24, $100.79… (most expensive first) |
+  | REQ-04 Cart | Changed the quantity from 1 to 2, then clicked Remove | Line price shows $0.00 (expected $28.30); the line stays in the cart |
+
+- **Computer agent** tab: 16 steps, the failing ones in red, each with its screenshot.
 - **View as · Client**: the submission says *Revision 1 went back to the freelancer*; the report is hidden.
 
-### 2 · Revision 2 — the fix passes (~2 min)
-As Sam: **Submit a revision**. The URL is now pre-filled with **revision 2** (`/demo-store/`, the fixed store;
-both links sit under the URL field). Submit. This time the agent shows
-*together 0 — the filters narrow each other* and *Order total went from $68 to $136*, then removes the item.
-REQ-05 **Pass**; REQ-04 **Needs clarification** (the SOW still says "fast" with no threshold — that is the
-client's to settle, so it does not hold the revision back). Pre-check passes and the report goes to the client.
+### 2 · Revision 2 — the fixed build passes (~2 min)
+As Sam: **Submit a revision**. It is pre-filled with **practicesoftwaretesting.com** (both builds are linked under
+the URL field). Submit. This time the agent sees:
+- search narrows 9 → 4 and shows "no products found"
+- sort shows cheapest first
+- "Hammer" + "ForgeFlex Tools" together show 6 (7 and 9 alone)
+- line $29.99 → $59.98 and total $29.99 → $59.98
+- Remove empties the cart
+- every image has alt text
+
+Result: **Compliant, 4 of 4 Pass**. The pre-check passes and the client gets the report.
+
+One red step stays on revision 2: *Resized to a phone → content overflows*. It's a real finding, but phone
+layout isn't in this agreement, so it doesn't count. The agent reports what it sees; the contract decides what matters.
 
 Walk the report in three layers:
-- **Verdict** — one line, with counts per status and which engine produced each part.
-- **Requirement by requirement** — each row shows what the agreement asks for, then what the computer agent,
-  vision analyser and text analyser each found.
-- **Computer agent** tab — the 15-step journey replay: desktop, phone, catalogue, search "linen" (12 → 2),
-  empty state, one filter, two filters together, product → **Add to cart** (Cart (0) → (1)), quantity → total,
-  remove, alt text. Click a thumbnail to enlarge the screenshot taken at that step.
-- **Vision analyser** / **Text analyser** tabs — screenshots and documents read against the criteria.
+- **Verdict**: one line, with counts per status and which engine produced each part.
+- **Requirement by requirement**: what the agreement asks for, then what the computer agent, vision analyser and
+  text analyser each found.
+- **Computer agent / Vision / Text** tabs: the journey replay (click a thumbnail to enlarge), the screenshots read
+  against the criteria, and the documents.
 
-Say the honest bit out loud: the badge says *Local browser* — a real Chromium running the exact
-script Kernel would run. With `KERNEL_API_KEY` set it runs in Kernel's cloud browser instead (Kernel needs a
-public URL, so deploy first). The agent never submits checkout — the sandbox confirmation page is evidenced by
-the freelancer's report, and the report says so.
+The badge names the host: *Kernel cloud browser* when `KERNEL_API_KEY` is set, otherwise *Local browser* (a real
+Chromium on this server running the same script, and not called Kernel).
+
+Caveats:
+- **Shared public sandbox.** Other testers add products and categories, which is why the cheapest items are $1.99
+  test entries. Rehearse on the day.
+- **Offline fallback.** Northwind M2 uses the two storefront copies this server hosts. `/demo-store-v1/` has
+  filters that don't combine and a total that ignores quantity; `/demo-store/` is fixed. The flow is the same, but
+  Kernel can't reach localhost, so use the local browser there.
+- **The agent never submits checkout**, so checkout (M2 of Toolshop) is evidenced by the freelancer's files, and
+  the report says so.
 
 ### 3 · The agent talks to the freelancer (~30 s)
 Rail → **Messages**. The **Freelancer Delivery Agent** has posted, privately to the freelancer, what each
@@ -91,9 +115,9 @@ Lumen Analytics (failed PDF export → $2,500 paid, $1,500 held), Harbor Dental 
 
 | What | How | Expected |
 |---|---|---|
-| Computer agent (no keys) | Submit revision 1 (`/demo-store-v1/`) to M2 as Sam | 15 steps, two red: filters do not combine, total stays $68. Pre-check returns it; client sees nothing |
-| Fixed revision | Submit revision 2 (`/demo-store/`) | Filters together 0, total $68 → $136. REQ-05 Pass, pre-check passes, client sees the report |
-| Computer agent (Kernel) | Add `KERNEL_API_KEY`, deploy, submit the **public** URL | Same journey, mode *Kernel cloud browser*, a session id |
+| Computer agent, live site | Toolshop M1: submit the with-bugs build, then the normal build | Rev 1: 4 of 4 Fail, returned to the freelancer. Rev 2: Compliant, client sees it |
+| Computer agent (Kernel) | Keep `KERNEL_API_KEY` set and use the Toolshop URLs (public) | Same journey, mode *Kernel cloud browser*, ~40 s |
+| Computer agent, offline | Northwind M2: `/demo-store-v1/`, then `/demo-store/` (start with `KERNEL_API_KEY=` blank) | Rev 1: filters don't combine, total stays $68. Rev 2 passes |
 | Vision + text with a model | Add `GROQ_API_KEY` (or Anthropic/Gemini), restart, resubmit | Vision tab shows per-requirement observations; header names the model |
 | Out-of-scope detection | Ask the PM "Can you also add typo-tolerant search?" as client | Exclusion quoted, change request opened |
 | In-scope question | Ask "Does the agreement cover an admin login?" | Answered from REQ-06, no change request |

@@ -182,6 +182,8 @@ export interface Project {
   advance: { status: FundingStatus; amount: number; paid: number; platformFee: number };
   isDemo: boolean;
   demoLabel?: string;
+  /** Demo only: public builds that play revision 1 (planted bugs) and revision 2 (fixed). */
+  demoUrls?: { broken: string; fixed: string; source: string; bugs: string };
   createdAt: string;
   updatedAt: string;
 }
@@ -464,5 +466,5 @@ export interface DB {
   messages: Message[];
   scopeChanges: ScopeChange[];
   audit: AuditEntry[];
-  meta: { seededAt: string | null; version: number };
+  meta: { seededAt: string | null; version: number; toolshopAddedAt?: string };
 }

@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 // while still using IPv6 where it works. curl was unaffected, which is what masked this.
 net.setDefaultAutoSelectFamilyAttemptTimeout(2500);
 import { api, evidenceHandler, paypalWebhook, errorHandler } from './routes.js';
-import { seed } from './seed.js';
+import { seed, ensureToolshopDemo } from './seed.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(here, '..', '..'); // repo root (works from src/ and dist/)
@@ -79,4 +79,5 @@ if (fs.existsSync(dist)) {
 app.use(errorHandler);
 
 await seed(false);
+ensureToolshopDemo();
 app.listen(PORT, HOST, () => console.log(`VeriPay API on http://${HOST}:${PORT}`));

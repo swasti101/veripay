@@ -83,6 +83,14 @@ const MODE_COPY: Record<string, string> = {
   DEMO_ADAPTER_HTTP_FETCH: 'a static fetch (no browser)',
 };
 
+// Mirrors server/src/seed.ts TOOLSHOP_DEMO, for projects created from the Toolshop sample SOW.
+const TOOLSHOP_DEMO = {
+  broken: 'https://with-bugs.practicesoftwaretesting.com/',
+  fixed: 'https://practicesoftwaretesting.com/',
+  source: 'Public practice store by Testsmith (practicesoftwaretesting.com) — standing in for the freelancer’s work. Shared sandbox: other testers can change its data.',
+  bugs: 'price sort is reversed, an empty search shows no message, the cart line price stays $0.00, Remove does nothing, and product images have no alt text',
+};
+
 export default function Delivery({ v, reload, mid }: WsProps) {
   const { config } = useApp();
   const p = v.project, party = v.party;
@@ -93,10 +101,15 @@ export default function Delivery({ v, reload, mid }: WsProps) {
   const qas = v.qaRuns.filter((q: any) => q.milestoneId === mid);
   const [qaId, setQaId] = useState<string | null>(null);
   const qa = qas.find((q: any) => q.id === qaId) || qas.at(-1);
-  // Demo storyline: the first submission is revision 1 of the storefront (two planted bugs the
-  // computer agent catches), and every later submission is the fixed storefront.
+  // Demo storyline: the first submission is revision 1 (planted bugs the computer agent catches),
+  // every later one is the fixed build. Toolshop uses two public builds, so nothing is deployed
+  // and Kernel can reach them; Northwind uses the two copies this server hosts.
   const base = config?.publicBaseUrl || location.origin;
-  const brokenUrl = `${base}/demo-store-v1/index.html`, fixedUrl = `${base}/demo-store/index.html`;
+  const demo = p.demoUrls || (/Toolshop Online Hardware Store/.test(ag?.sowText || '') ? TOOLSHOP_DEMO : null);
+  const brokenUrl = demo ? demo.broken : `${base}/demo-store-v1/index.html`;
+  const fixedUrl = demo ? demo.fixed : `${base}/demo-store/index.html`;
+  const bugs = demo ? demo.bugs : "filters don't combine and the cart total ignores the quantity";
+  const showDemo = p.isDemo || !!demo;
   const defaultUrl = subs.length ? fixedUrl : brokenUrl;
   // The sample report claims everything passes — useful in the demo because the browser run
   // then contradicts it on revision 1, and covers the sandbox confirmation the agent never clicks.
@@ -105,7 +118,7 @@ export default function Delivery({ v, reload, mid }: WsProps) {
   const [files, setFiles] = useState<FileList | null>(null);
   const [showForm, setShowForm] = useState(false);
   const a = useAction();
-  useEffect(() => { setF((x) => ({ ...x, url: x.url || (p.isDemo ? defaultUrl : '') })); }, [defaultUrl]);
+  useEffect(() => { setF((x) => ({ ...x, url: x.url || (showDemo ? defaultUrl : '') })); }, [defaultUrl]);
 
   if (!ag) return <Empty title="Delivery opens once both sides approve the agreement">Agree the scope first, so there is something to check the work against.</Empty>;
   if (!st) return <Empty title="Choose a milestone above" />;
@@ -157,10 +170,11 @@ export default function Delivery({ v, reload, mid }: WsProps) {
             <div>
               <label className="field-label" htmlFor="sub-url">Where can it be seen?</label>
               <input id="sub-url" className="input" value={f.url} onChange={(e) => setF({ ...f, url: e.target.value })} placeholder="https://staging.yoursite.com" />
-              {p.isDemo && (
+              {showDemo && (
                 <p className="mt-1.5 text-[12px] text-ink-3">
-                  Demo storefront: <button type="button" className="underline decoration-rule-strong underline-offset-2 hover:text-ink" onClick={() => setF({ ...f, url: brokenUrl })}>revision 1</button> has two planted bugs (filters don't combine; the cart total ignores quantity),{' '}
-                  <button type="button" className="underline decoration-rule-strong underline-offset-2 hover:text-ink" onClick={() => setF({ ...f, url: fixedUrl })}>revision 2</button> is the fixed version. {subs.length ? 'Revision 2' : 'Revision 1'} is pre-filled.
+                  Demo deliverable: <button type="button" className="underline decoration-rule-strong underline-offset-2 hover:text-ink" onClick={() => setF({ ...f, url: brokenUrl })}>revision 1</button> has planted bugs ({bugs});{' '}
+                  <button type="button" className="underline decoration-rule-strong underline-offset-2 hover:text-ink" onClick={() => setF({ ...f, url: fixedUrl })}>revision 2</button> is the fixed build. {subs.length ? 'Revision 2' : 'Revision 1'} is pre-filled.
+                  {demo && <span className="mt-0.5 block">{demo.source}</span>}
                 </p>
               )}
               {config?.kernel.configured && /127\.0\.0\.1|localhost/.test(f.url) && (

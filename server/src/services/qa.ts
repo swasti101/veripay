@@ -32,7 +32,10 @@ function hasFunctionalEvidence(ctx: Ctx, reqId: string) {
 }
 
 function kernelSignalsFor(req: Requirement, k: KernelRun) {
-  const t = (req.title + ' ' + req.description).toLowerCase();
+  // Match on the acceptance criteria too: that is where "alt text", "sort" or "line total" usually live.
+  const crit = req.acceptanceCriteria.join(' ') + ' ' + req.description;
+  const t = (req.title + ' ' + crit).toLowerCase();
+  const strip = (v: unknown) => String(v).replace(/^[^:]+: /, '');
   const pos: string[] = [];
   const neg: string[] = [];
   // Behaviour the browser reproduced that contradicts a measurable acceptance criterion.
@@ -59,16 +62,20 @@ function kernelSignalsFor(req: Requirement, k: KernelRun) {
   if (/search/.test(t)) {
     if (any('searchInput')) pos.push(`${src}: search input present`); else neg.push(`${src}: no search input found`);
     const probe = k.pages.map((p) => p.signals.searchProbe).find(Boolean);
-    if (probe) pos.push(`${src}: ${probe}`);
+    if (probe) (/^did not/.test(String(probe)) ? neg : pos).push(`${src}: ${strip(probe)}${/^did not/.test(String(probe)) ? ' — the results did not narrow' : ''}`);
     const emptyStep = k.steps?.find((s) => /cannot match/.test(s.what));
-    if (emptyStep) (emptyStep.ok ? pos : neg).push(`${src}: ${emptyStep.found}`);
+    if (emptyStep) {
+      const line = `${src}: searching for something that cannot match — ${emptyStep.found}`;
+      (emptyStep.ok ? pos : neg).push(line);
+      if (!emptyStep.ok && /message|empty|nothing matches|no products/i.test(crit)) defects.push(line);
+    }
   }
   if (/filter/.test(t)) {
     (any('filterControls') ? pos : neg).push(`${src}: ${any('filterControls') ? 'filter controls present' : 'no filter controls detected'}`);
     if (first.filterProbe) {
       const f = String(first.filterProbe);
-      const m = f.match(/(\d+) → (\d+)/);
-      (m && m[1] !== m[2] ? pos : neg).push(`${src}: changing a filter ${m && m[1] !== m[2] ? 'changed' : 'did not change'} the results (${f})`);
+      const changed = !/^unchanged/.test(f);
+      (changed ? pos : neg).push(`${src}: changing a filter ${changed ? 'changed' : 'did not change'} the results (${strip(f)})`);
     }
     if (first.filterCombine) {
       const f = String(first.filterCombine);
@@ -77,18 +84,44 @@ function kernelSignalsFor(req: Requirement, k: KernelRun) {
       if (!/^combine/.test(f) && /combin/i.test(req.acceptanceCriteria.join(' ') + ' ' + req.description)) defects.push(line);
     }
   }
+  if (/sort/.test(t) && first.sortPrice) {
+    const f = String(first.sortPrice);
+    const ok = /^cheapest/.test(f);
+    const line = `${src}: sorting ${ok ? 'put the cheapest product first' : 'did not put the cheapest product first'} (${strip(f)})`;
+    (ok ? pos : neg).push(line);
+    if (!ok && /low to high|low-high|cheapest|ascending/i.test(crit)) defects.push(line);
+  }
+  if (/alt text|alternative text|alt-text/.test(t) && first.altText) {
+    const f = String(first.altText);
+    const ok = /^complete/.test(f);
+    const line = `${src}: ${strip(f)}`;
+    (ok ? pos : neg).push(line);
+    if (!ok) defects.push(line);
+  }
   if (/cart|checkout/.test(t)) {
     const c = pagesMatching(/cart|checkout/i);
     (c.length || any('cartLink') ? pos : neg).push(`${src}: ${c.length ? 'cart/checkout page reached' : any('cartLink') ? 'cart control present' : 'no cart or checkout found'}`);
     if (first.addToCart) (/changed/.test(String(first.addToCart)) ? pos : neg).push(`${src}: clicking "Add to cart" — ${first.addToCart}`);
-    if (first.cartTotal) {
+    if (first.cartTotal && /total|quantit/.test(t)) {
       const f = String(first.cartTotal);
       const line = `${src}: order total ${/^follows/.test(f) ? 'updated when the quantity changed' : 'did not change when the quantity changed'} (${f.replace(/^[^:]+: /, '')})`;
       (/^follows/.test(f) ? pos : neg).push(line);
       if (!/^follows/.test(f) && /total|quantit/i.test(req.acceptanceCriteria.join(' ') + ' ' + req.description)) defects.push(line);
     }
-    if (first.cartRemove) (/works/.test(String(first.cartRemove)) ? pos : neg).push(`${src}: ${first.cartRemove}`);
-    const form = k.pages.find((p) => Number(p.signals.requiredFields) > 0);
+    if (first.cartLine && /line|quantit/.test(t)) {
+      const f = String(first.cartLine);
+      const ok = /^follows/.test(f);
+      const line = `${src}: the cart line price ${ok ? 'follows the quantity' : 'does not follow the quantity'} (${strip(f)})`;
+      (ok ? pos : neg).push(line);
+      if (!ok && /line|price . quantity|subtotal/i.test(crit)) defects.push(line);
+    }
+    if (first.cartRemove && /remov/.test(t)) {
+      const ok = /works/.test(String(first.cartRemove));
+      const line = `${src}: clicking Remove on a cart line — ${ok ? 'the line left the cart' : 'the line stayed in the cart'}`;
+      (ok ? pos : neg).push(line);
+      if (!ok && /remov/i.test(crit)) defects.push(line);
+    }
+    const form = k.pages.find((p) => Number(p.signals.requiredFields) > 0 && /checkout|cart/i.test(p.url));
     if (form) pos.push(`${src}: checkout form found with ${form.signals.requiredFields} required fields (not submitted — no order is ever placed)`);
   }
   if (/admin|dashboard/.test(t)) {
@@ -223,7 +256,7 @@ export async function runQA(ctx: Ctx): Promise<Omit<QARun, 'id' | 'projectId' | 
     }
     const m = await aiJSON<any>(
       `You are the neutral QA Mediator coordinating domain review agents (${Object.values(DOMAIN_AGENTS).join(', ')}). Compare delivery evidence with the approved SOW requirements only.
-Rules: Use PASS only with sufficient evidence for every acceptance criterion; if functional evidence is required, a screenshot alone is insufficient. Use UNVERIFIED when evidence is missing (never FAIL for missing evidence). Use NEEDS_CLARIFICATION when the requirement itself is unmeasurable and lacks an approved clarification. Use OUT_OF_SCOPE only for items not in the SOW. Freelancer claims are claims, not proof.`,
+Rules: Use PASS only with sufficient evidence for every acceptance criterion; if functional evidence is required, a screenshot alone is insufficient. Use UNVERIFIED when evidence is missing (never FAIL for missing evidence). Use NEEDS_CLARIFICATION when the requirement itself is unmeasurable and lacks an approved clarification. Use OUT_OF_SCOPE only for items not in the SOW. Freelancer claims are claims, not proof. Write explanation and actual for the client and freelancer in plain words — say what the browser did and saw; never quote internal field names such as productCards, sortPrice or cartLine.`,
       `REQUIREMENTS: ${JSON.stringify(reqBrief)}
 KERNEL RUN (${ctx.kernel.mode}; ${ctx.kernel.note}): ${JSON.stringify({ pages: ctx.kernel.pages, actions: ctx.kernel.actions.slice(0, 30), consoleErrors: ctx.kernel.consoleErrors.slice(0, 10) })}
 VISION FINDINGS: ${JSON.stringify(vision.findings)}
