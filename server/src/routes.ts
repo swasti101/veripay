@@ -623,7 +623,8 @@ async function payoutTo(p: Project, mid: string | null, source: Transaction | nu
     const done = r.itemStatus === 'SUCCESS';
     if (done) apply(net);
     else if (!mid) p.advance.status = 'AWAITING_DISBURSEMENT';
-    const rec = tx({ projectId: p.id, milestoneId: mid, type: type as any, amount: net, status: done ? 'SUCCESS' : `PENDING (${r.batchStatus})`, mode: r.mode, paypal: { payoutBatchId: r.payoutBatchId }, payee: receiver.id, initiatedBy: actor.id, allocationId, note: `${note}${feePct > 0 ? ` · gross $${gross}, platform fee ${feePct}% = $${feeAmount}, net to ${receiver.name} $${net}` : ''}` });
+    const extra = (r as any).fallbackNote ? ` ${(r as any).fallbackNote}` : '';
+    const rec = tx({ projectId: p.id, milestoneId: mid, type: type as any, amount: net, status: done ? 'SUCCESS' : `PENDING (${r.batchStatus})`, mode: r.mode, paypal: { payoutBatchId: r.payoutBatchId }, payee: receiver.id, initiatedBy: actor.id, allocationId, note: `${note}${feePct > 0 ? ` · gross $${gross}, platform fee ${feePct}% = $${feeAmount}, net to ${receiver.name} $${net}` : ''}${extra}` });
     if (done && feeAmount > 0) tx({ projectId: p.id, milestoneId: mid, type: 'PLATFORM_FEE', amount: feeAmount, status: 'RETAINED', mode: r.mode, paypal: {}, initiatedBy: 'platform', allocationId, note: `Platform fee ${feePct}% on gross $${gross} retained on the platform PayPal account` });
     return rec;
   } catch (e: any) {

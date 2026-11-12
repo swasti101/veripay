@@ -106,7 +106,7 @@ export default function Payments({ v, reload, mid }: WsProps) {
           { field: 'mode', cellRenderer: (q: any) => (q.value === 'SIMULATED' ? <SimTag /> : <Badge tone="green">{q.value}</Badge>), maxWidth: 150 },
           { headerName: 'PayPal IDs', valueGetter: (q: any) => Object.entries(q.data.paypal).map(([k, val]) => `${k}: ${val}`).join(' · '), minWidth: 260 },
           { field: 'note', minWidth: 260 },
-          { headerName: '', maxWidth: 110, sortable: false, filter: false, cellRenderer: (q: any) => (['FREELANCER_PAYOUT', 'EXPERT_FEE_PAYOUT'].includes(q.data.type) && (/PENDING|FAILED|AWAITING/.test(q.data.status)) ? <button className="btn-ghost text-xs" onClick={() => a.run(async () => { await api.post(`/transactions/${q.data.id}/refresh`); await reload(); })}>{/PENDING/.test(q.data.status) ? 'Refresh' : 'Retry'}</button> : null) },
+          { headerName: '', maxWidth: 110, sortable: false, filter: false, cellRenderer: (q: any) => (['FREELANCER_PAYOUT', 'EXPERT_FEE_PAYOUT'].includes(q.data.type) && (/PENDING|FAILED|AWAITING/.test(q.data.status)) ? <button className="btn-ghost text-xs" onClick={(e) => { e.stopPropagation(); a.run(async () => { await api.post(`/transactions/${q.data.id}/refresh`); await reload(); }); }}>{/PENDING/.test(q.data.status) ? 'Refresh' : 'Retry'}</button> : null) },
         ]} />
       </Section>
     </div>
