@@ -4,12 +4,13 @@
   "description": "VeriPay AI - Delivery Verification & Milestone Payment Platform",
   "private": true,
   "scripts": {
-    "install:all": "npm install && npm --prefix server install --include=dev && npm --prefix client install --include=dev",
+    "postinstall": "npm --prefix server install --include=dev && npm --prefix client install --include=dev",
+    "install:all": "npm install --include=dev && npm --prefix server install --include=dev && npm --prefix client install --include=dev",
     "dev": "concurrently -n api,web \"npm run dev:server\" \"npm run dev:client\"",
     "dev:server": "cd server && npx tsx watch src/index.ts",
     "dev:client": "cd client && npx vite",
     "build:client": "cd client && npx vite build",
-    "build": "npm run build:client && cd server && npx tsc",
+    "build": "npm run install:all && npm run build:client && cd server && npx tsc",
     "start": "cd server && node dist/index.js",
     "seed": "cd server && npx tsx src/reset.ts",
     "sdk:generate": "npx --yes @apimatic/cli sdk generate -i apimatic -l typescript -d apimatic/sdk/typescript -f -k \"$APIMATIC_API_KEY\"",
@@ -24,7 +25,7 @@
     "sow"
   ],
   "license": "ISC",
-  "devDependencies": {
+  "dependencies": {
     "concurrently": "^10.0.7"
   },
   "engines": {
